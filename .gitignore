@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.tlog
+*.tlog.raw
+mav.parm
+.DS_Store
