@@ -115,3 +115,4 @@ fi
 
 echo
 echo "Done. With the flight controller wired up, run: $VENV/bin/python $REPO_DIR/check_link.py"
+echo "Bench motor test (PROPS OFF): $VENV/bin/python $REPO_DIR/motor_test.py"

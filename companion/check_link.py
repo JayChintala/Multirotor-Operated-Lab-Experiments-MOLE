@@ -72,6 +72,11 @@ def main():
     m.target_system, m.target_component = sysid, compid
     print("Heartbeat from system %d component %d" % (sysid, compid))
 
+    # The first command after connecting is often ignored unless the FC has
+    # already seen a heartbeat from us, so announce ourselves first.
+    m.mav.heartbeat_send(mav.MAV_TYPE_ONBOARD_CONTROLLER, mav.MAV_AUTOPILOT_INVALID, 0, 0, 0)
+    time.sleep(1)
+
     # Ask for telemetry (read-only requests).
     m.mav.command_long_send(sysid, compid, mav.MAV_CMD_REQUEST_MESSAGE, 0,
                             mav.MAVLINK_MSG_ID_AUTOPILOT_VERSION, 0, 0, 0, 0, 0, 0)
