@@ -144,17 +144,21 @@ def main():
     try:
         for motor in a.motor:  # test motors one at a time
             current = motor  # remember it so Ctrl+C can stop it
+
             letter = chr(ord("A") + motor - 1)  # 1->A, 2->B, ... (FC Mission Planner naming)
             print("Motor %d (%s): spinning..." % (motor, letter))
             result = motor_test(m, motor, a.throttle, a.duration)  # send command, wait for ACK
+
             if result != mav.MAV_RESULT_ACCEPTED:  # FC refused or never replied
                 # Turn the numeric result into its enum name for the message
                 name = mav.enums["MAV_RESULT"][result].name if result is not None else "no reply"
                 print("  Refused: %s. Common causes: RC not calibrated, safety switch on,"
                       " vehicle not landed, ESC/motor outputs not configured." % name)
                 return 1  # stop on the first failure; don't try the remaining motors
+
             time.sleep(a.duration + 1)  # FC stops the motor after the timeout; +1 s margin
             current = None  # motor has stopped, nothing for Ctrl+C to stop
+    
     except KeyboardInterrupt:  # Ctrl+C stop 
         if current is not None:
             stop_motor(m, current)
