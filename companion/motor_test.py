@@ -1,15 +1,15 @@
 #!/home/molepi/mav/bin/python3
-"""Bench motor test for the MOLE flight controller via mavlink-router (tcp:127.0.0.1:5760).
+"""Bench motor test
+Communicates to flight controller via mavlink-router (tcp:127.0.0.1:5760).
 
 Spins motors one at a time using MAV_CMD_DO_MOTOR_TEST, the same command as
-Mission Planner's Motor Test page. The FC stops each motor by itself after
---duration seconds. This script NEVER arms the vehicle.
+Mission Planner's Motor Test page. Run via: 
 
-    python motor_test.py                  # motors 1-4, 7% throttle, 2 s each
-    python motor_test.py -m 3 -t 10       # only motor C (3) at 10%
+    ~/mole/companion/python motor_test.py                  # motors 1-4, 7% throttle, 2 s each
+    ~/mole/companion/python motor_test.py -m 3 -t 10       # only motor C (3) at 10%
 
 Motor numbers are ArduPilot's test order: 1=A, 2=B, ... going clockwise from
-the front-right motor on a quad X. REMOVE THE PROPELLERS FIRST.
+the front-right motor on a quad X. 
 """
 import argparse
 import sys
@@ -42,7 +42,7 @@ def parse_args():
         p.error("throttle must be between 0 and %d %%" % MAX_THROTTLE)
     if not 0 < a.duration <= MAX_DURATION:
         p.error("duration must be between 0 and %d s" % MAX_DURATION)
-    a.motor = a.motor or list(range(1, a.count + 1))
+    a.motor = a.motor or list(range(1, a.count + 1))  # no -m: test every motor
     if any(not 1 <= n <= a.count for n in a.motor):
         p.error("motor numbers must be between 1 and %d" % a.count)
     return a
@@ -89,6 +89,7 @@ def print_statustext(m):
 
 
 def motor_test(m, motor, throttle, duration):
+    """Start one motor and return the FC's MAV_RESULT, or None if no ACK."""
     m.mav.command_long_send(m.target_system, m.target_component,
                             mav.MAV_CMD_DO_MOTOR_TEST, 0,
                             motor,                            # motor (test order)
@@ -96,6 +97,7 @@ def motor_test(m, motor, throttle, duration):
                             throttle,                         # throttle %
                             duration,                         # timeout s
                             0, 0, 0)                          # one motor, default order
+    # Wait for the ACK, echoing any STATUSTEXT (refusal reasons) along the way
     deadline = time.time() + 3
     while time.time() < deadline:
         ack = m.recv_match(type=["COMMAND_ACK", "STATUSTEXT"], blocking=True, timeout=0.5)
@@ -116,13 +118,10 @@ def stop_motor(m, motor):
 
 
 def main():
-    a = parse_args()
+    a = parse_args() # Gathers CLI Args 
     print("Motor test: motors %s at %g %% for %g s each." % (a.motor, a.throttle, a.duration))
-    print("PROPELLERS OFF, FC on battery power, frame held down.")
-    if input("Type YES to continue: ").strip() != "YES":
-        print("Aborted.")
-        return 1
 
+    # Connect as an onboard computer so we don't look like a second GCS
     m = mavutil.mavlink_connection(CONN, source_system=MY_SYSID,
                                    source_component=mav.MAV_COMP_ID_ONBOARD_COMPUTER)
     hb = wait_autopilot(m)
@@ -130,6 +129,8 @@ def main():
         print("No heartbeat from the flight controller. Run check_link.py for a checklist.")
         return 1
     m.target_system, m.target_component = hb.get_srcSystem(), hb.get_srcComponent()
+    
+    # Refuse to run if armed; motor test is a disarmed-only operation
     if hb.base_mode & mav.MAV_MODE_FLAG_SAFETY_ARMED:
         print("Vehicle is ARMED. Disarm it first; motor test only runs disarmed.")
         return 1
@@ -137,23 +138,28 @@ def main():
         print("FC is sending telemetry but not answering commands. Check Pi pin 8 (TX)"
               " -> FC RX7 and SERIAL7_PROTOCOL=2. No motor command was sent.")
         return 1
-    print_statustext(m)
+    print_statustext(m)  # flush anything queued before the test starts
 
-    current = None
+    current = None  # motor currently spinning, so Ctrl+C can stop it
     try:
-        for motor in a.motor:
-            current = motor
-            letter = chr(ord("A") + motor - 1)
+        for motor in a.motor:  # test motors one at a time
+            current = motor  # remember it so Ctrl+C can stop it
+
+            letter = chr(ord("A") + motor - 1)  # 1->A, 2->B, ... (FC Mission Planner naming)
             print("Motor %d (%s): spinning..." % (motor, letter))
-            result = motor_test(m, motor, a.throttle, a.duration)
-            if result != mav.MAV_RESULT_ACCEPTED:
+            result = motor_test(m, motor, a.throttle, a.duration)  # send command, wait for ACK
+
+            if result != mav.MAV_RESULT_ACCEPTED:  # FC refused or never replied
+                # Turn the numeric result into its enum name for the message
                 name = mav.enums["MAV_RESULT"][result].name if result is not None else "no reply"
                 print("  Refused: %s. Common causes: RC not calibrated, safety switch on,"
                       " vehicle not landed, ESC/motor outputs not configured." % name)
-                return 1
-            time.sleep(a.duration + 1)  # FC stops the motor after the timeout
-            current = None
-    except KeyboardInterrupt:
+                return 1  # stop on the first failure; don't try the remaining motors
+
+            time.sleep(a.duration + 1)  # FC stops the motor after the timeout; +1 s margin
+            current = None  # motor has stopped, nothing for Ctrl+C to stop
+    
+    except KeyboardInterrupt:  # Ctrl+C stop 
         if current is not None:
             stop_motor(m, current)
             print("\nStopped motor %d." % current)
