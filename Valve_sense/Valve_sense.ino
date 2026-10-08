@@ -18,7 +18,7 @@ uint32_t time_start1 = 0;
 uint32_t time_start2 = 0;
 uint32_t time_current = 0;
 
-int time_s = 5;
+int time_s = 10;
 
 bool state_Valve1 = false; // true if valve receives power, false is off
 bool state_Valve2 = false;
@@ -240,7 +240,7 @@ void setValveOn(int valve_num){
     state_Valve2 = true;
   } else {
     // Throw an error.
-    Serial.println("Fwater detected");
+    Serial.println("Both Solenoids already filled");
   }
 }
 
