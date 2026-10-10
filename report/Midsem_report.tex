@@ -1,0 +1,559 @@
+\documentclass[11pt,letterpaper]{article}
+
+% --------------------------------------------------------------------------
+% MOLE mid-semester design report template
+% Replace text in angle brackets and the example rows in tables as the project
+% develops. The document is intentionally structured to match the assignment
+% brief; sections may be expanded or moved as needed.
+% --------------------------------------------------------------------------
+
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{pdflscape}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{amsmath}
+\usepackage{siunitx}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{url}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!50!black,
+    citecolor=blue!50!black,
+    urlcolor=blue!60!black,
+    pdftitle={M.O.L.E. Design Report},
+    pdfauthor={Group 3}
+}
+
+\setstretch{1.15}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\setlist{itemsep=0.2em, topsep=0.25em}
+\setcounter{tocdepth}{2}
+\renewcommand{\arraystretch}{1.2}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{MOLE Design Report}
+\rhead{\thepage}
+\setlength{\headheight}{14pt}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\titleformat{\section}{\large\bfseries}{\thesection}{0.75em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.75em}{}
+
+% ---------- Project-specific placeholders ----------
+\newcommand{\projecttitle}{Multirotor-Operated Lab Experiments (MOLE)}
+\newcommand{\coursetitle}{24671 Electromechanical Systems Design}
+\newcommand{\groupname}{Group 3: M.O.L.E}
+\newcommand{\reportdate}{<Month Day, Year>}
+\newcommand{\placeholder}[1]{\textcolor{gray}{\textit{[#1]}}}
+
+\newcommand{\insertfigure}[4][0.85\textwidth]{%
+    \begin{figure}[H]
+        \centering
+        \IfFileExists{#2}{\includegraphics[width=#1]{#2}}{%
+            \fbox{\parbox[c][2.25in][c]{#1}{\centering\placeholder{Insert figure: #2}}}}
+        \caption{#3}
+        \label{#4}
+    \end{figure}
+}
+
+\begin{document}
+
+% ============================== TITLE PAGE ================================
+\begin{titlepage}
+    \centering
+    \vspace*{0.35in}
+    \includegraphics[width=1.25in]{images/Carnegie_Mellon_University_seal.pdf}
+
+    \vspace{0.45in}
+    {\Large \coursetitle\par}
+    \vspace{0.35in}
+    {\LARGE\bfseries \projecttitle\par}
+    \vspace{0.2in}
+    {\Large Midsemester Design Report\par}
+    \vfill
+
+    \begin{tabular}{rl}
+        \textbf{Date:} & \reportdate \\
+        \textbf{Group:} & \groupname \\
+    \end{tabular}
+
+    \vspace{0.5in}
+    \begin{tabular}{p{2.5in}p{2.5in}}
+        \textbf{Team member} & \textbf{Signature} \\[0.35in]
+        \placeholder{Name 1} & \hrulefill \\[0.35in]
+        \placeholder{Name 2} & \hrulefill \\[0.35in]
+        \placeholder{Name 3} & \hrulefill \\[0.35in]
+        \placeholder{Name 4} & \hrulefill \\[0.35in]
+        \placeholder{Name 5} & \hrulefill \\
+    \end{tabular}
+\end{titlepage}
+
+\tableofcontents
+\clearpage
+
+% ========================== EXECUTIVE SUMMARY =============================
+\section*{Executive Summary}
+\addcontentsline{toc}{section}{Executive Summary}
+\textbf{Problem.} \placeholder{In one paragraph, state the user problem, operating
+context, and why it matters.}
+
+\textbf{Product and conceptual design.} \placeholder{Summarize the proposed
+system, its main features, and the design concept selected.}
+
+\textbf{Final prototype.} \placeholder{State exactly what the final prototype
+will demonstrate, and distinguish demonstrated functionality from deferred
+features.}
+
+\textbf{Results.} \placeholder{Summarize the prototype tests, the most important
+quantitative results, and the principal design decisions that follow from them.}
+
+\textbf{Takeaway.} \placeholder{Write this section last. It should stand alone as
+an abstract of the full report.}
+
+\clearpage
+
+% =========================== PROBLEM DEFINITION ===========================
+\section{Problem Definition}
+\subsection{Problem Description}
+\placeholder{Describe the problem in measurable terms. Explain the current
+workflow, the users affected, the environment in which the system operates,
+and the consequences of not solving the problem. Define any technical terms.}
+
+\subsection{Markets Addressed}
+\placeholder{Identify the market or application segments, expected users,
+purchasers, and deployment environments. Explain the initial beachhead market
+and possible future markets.}
+
+\subsection{Primary Competitors and Existing Solutions}
+\placeholder{Compare direct competitors, adjacent products, and the current
+manual or improvised solution. Use consistent comparison criteria.}
+
+\begin{table}[H]
+\centering
+\caption{Preliminary competitor comparison.}
+\label{tab:competitors}
+\begin{tabularx}{\textwidth}{lYYYY}
+\toprule
+\textbf{Competitor/solution} & \textbf{Core offering} & \textbf{Strengths} &
+\textbf{Limitations} & \textbf{Web link} \\
+\midrule
+\placeholder{Competitor 1} & \placeholder{...} & \placeholder{...} &
+\placeholder{...} & \url{https://example.com} \\
+\placeholder{Competitor 2} & \placeholder{...} & \placeholder{...} &
+\placeholder{...} & \url{https://example.com} \\
+\placeholder{Current practice} & \placeholder{...} & \placeholder{...} &
+\placeholder{...} & \placeholder{N/A} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\insertfigure[0.75\textwidth]{images/competitor-1.png}{Key competitor or
+existing solution. Replace the filename and cite the source.}{fig:competitor}
+
+\subsection{Assumptions and Constraints}
+\begin{itemize}
+    \item \placeholder{Technical assumption, e.g., available power, network,
+    or lab infrastructure.}
+    \item \placeholder{User or operational assumption.}
+    \item \placeholder{Safety, budget, schedule, size, weight, or regulatory
+    constraint.}
+    \item \placeholder{What is explicitly out of scope for this project?}
+\end{itemize}
+
+% ===================== STAKEHOLDERS AND CUSTOMER NEEDS ====================
+\section{Stakeholders and Customer Needs}
+\subsection{Stakeholder Identification}
+\placeholder{List primary users, customers, operators, maintainers, instructors,
+administrators, suppliers, regulators, and other parties affected by the
+design. Explain each stakeholder's influence and interest.}
+
+\begin{table}[H]
+\centering
+\caption{Stakeholder map.}
+\label{tab:stakeholders}
+\begin{tabularx}{\textwidth}{lYYY}
+\toprule
+\textbf{Stakeholder} & \textbf{Role/context} & \textbf{Goals} &
+\textbf{Influence/priority} \\
+\midrule
+\placeholder{Primary user} & \placeholder{...} & \placeholder{...} &
+\placeholder{High} \\
+\placeholder{Customer/purchaser} & \placeholder{...} & \placeholder{...} &
+\placeholder{High} \\
+\placeholder{Maintainer} & \placeholder{...} & \placeholder{...} &
+\placeholder{Medium} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{External Outreach}
+\placeholder{Describe interviews, surveys, observations, expert consultations,
+or other outreach. State who participated, when, how many responses were
+obtained, and how the evidence was analyzed.}
+
+\subsection{Internal Need Generation}
+\placeholder{Describe needs generated from team brainstorming, engineering
+analysis, course requirements, and lessons from early prototypes.}
+
+\subsection{Organization and Classification}
+\placeholder{Explain how raw statements were converted into needs, normalized,
+de-duplicated, and organized by user, function, or priority.}
+
+\subsection{Final Customer Needs}
+\begin{longtable}{p{0.11\textwidth}p{0.48\textwidth}p{0.16\textwidth}p{0.15\textwidth}}
+\caption{Final customer needs.}\label{tab:customer-needs}\\
+\toprule
+\textbf{ID} & \textbf{Need statement} & \textbf{Source} & \textbf{Priority}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ID} & \textbf{Need statement} & \textbf{Source} & \textbf{Priority}\\
+\midrule
+\endhead
+\placeholder{N1} & \placeholder{The system should...} & \placeholder{Interview/survey} &
+\placeholder{1--5} \\
+\placeholder{N2} & \placeholder{The system should...} & \placeholder{Observation} &
+\placeholder{1--5} \\
+\placeholder{N3} & \placeholder{The system should...} & \placeholder{Team analysis} &
+\placeholder{1--5} \\
+\bottomrule
+\end{longtable}
+
+% =========================== TARGET SPECIFICATIONS =======================
+\section{Target Specifications}
+\subsection{Mapping Needs to Metrics}
+\placeholder{Explain how each important need was translated into a measurable
+engineering metric, including units, direction of improvement, and test method.}
+
+\begin{table}[H]
+\centering
+\caption{Need-to-metric mapping.}
+\label{tab:need-metric}
+\begin{tabularx}{\textwidth}{lYYYY}
+\toprule
+\textbf{Need ID} & \textbf{Metric} & \textbf{Units} & \textbf{Why it matters} &
+\textbf{Verification method} \\
+\midrule
+\placeholder{N1} & \placeholder{Response time} & \si{\second} &
+\placeholder{...} & \placeholder{Bench test} \\
+\placeholder{N2} & \placeholder{Accuracy} & \si{\percent} &
+\placeholder{...} & \placeholder{Experiment} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Competitive Analysis}
+\placeholder{Compare competitor performance against the metrics above. Identify
+gaps and opportunities rather than only listing features.}
+
+\subsection{Target Specifications}
+\begin{table}[H]
+\centering
+\caption{Final target specifications.}
+\label{tab:specifications}
+\begin{tabularx}{\textwidth}{lYYYY}
+\toprule
+\textbf{Metric} & \textbf{Minimum} & \textbf{Target} & \textbf{Ideal} &
+\textbf{Test method} \\
+\midrule
+\placeholder{Metric 1} & \placeholder{...} & \placeholder{...} &
+\placeholder{...} & \placeholder{...} \\
+\placeholder{Metric 2} & \placeholder{...} & \placeholder{...} &
+\placeholder{...} & \placeholder{...} \\
+\placeholder{Metric 3} & \placeholder{...} & \placeholder{...} &
+\placeholder{...} & \placeholder{...} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ============================ CONCEPT GENERATION ==========================
+\section{Concept Generation}
+\subsection{Functional Decomposition}
+\placeholder{Define the overall system function and decompose it into
+subfunctions. A block diagram should show inputs, outputs, flows, and system
+boundaries.}
+
+\insertfigure{images/functional-decomposition.png}{Functional decomposition
+of the proposed system.}{fig:functional-decomposition}
+
+\subsection{Concept Generation Activities}
+\subsubsection{External Search}
+\placeholder{Describe literature, patent, product, standards, and web searches.
+Record the sources and explain what design principles were adopted or rejected.}
+
+\subsubsection{Internal Search}
+\placeholder{Describe brainstorming, analogous products, morphological charts,
+sketching, workshops, and other team activities.}
+
+\subsection{Subsystem Concepts}
+\placeholder{Present the alternatives generated for each major subsystem. Move
+additional sketches to Appendix~\ref{app:concept-sketches}.}
+
+\begin{table}[H]
+\centering
+\caption{Morphological chart of subsystem alternatives.}
+\label{tab:morphological}
+\begin{tabularx}{\textwidth}{lYYY}
+\toprule
+\textbf{Subsystem} & \textbf{Alternative A} & \textbf{Alternative B} &
+\textbf{Alternative C} \\
+\midrule
+\placeholder{Subsystem 1} & \placeholder{...} & \placeholder{...} &
+\placeholder{...} \\
+\placeholder{Subsystem 2} & \placeholder{...} & \placeholder{...} &
+\placeholder{...} \\
+\placeholder{Subsystem 3} & \placeholder{...} & \placeholder{...} &
+\placeholder{...} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Full System Concepts}
+\placeholder{Show the full-system combinations considered from the subsystem
+alternatives. Give each concept a short name and describe its operating
+principle, advantages, risks, and unresolved questions.}
+
+\insertfigure{images/system-concepts.png}{Overview of full-system concepts
+considered.}{fig:system-concepts}
+
+% ============================ CONCEPT SELECTION ============================
+\section{Concept Selection}
+\subsection{Selection Process}
+\placeholder{Describe screening, feasibility checks, a Pugh matrix, weighted
+decision matrix, or other methods. Explain criteria, weights, scoring scale,
+and how disagreements were resolved.}
+
+\begin{table}[H]
+\centering
+\caption{Weighted concept-selection matrix.}
+\label{tab:selection}
+\begin{tabularx}{\textwidth}{lYYYY}
+\toprule
+\textbf{Criterion (weight)} & \textbf{Concept A} & \textbf{Concept B} &
+\textbf{Concept C} & \textbf{Rationale} \\
+\midrule
+\placeholder{Criterion 1 (0.25)} & \placeholder{score} & \placeholder{score} &
+\placeholder{score} & \placeholder{...} \\
+\placeholder{Criterion 2 (0.25)} & \placeholder{score} & \placeholder{score} &
+\placeholder{score} & \placeholder{...} \\
+\placeholder{Criterion 3 (0.25)} & \placeholder{score} & \placeholder{score} &
+\placeholder{score} & \placeholder{...} \\
+\placeholder{Criterion 4 (0.25)} & \placeholder{score} & \placeholder{score} &
+\placeholder{score} & \placeholder{...} \\
+\midrule
+\textbf{Weighted total} & \textbf{\placeholder{...}} & \textbf{\placeholder{...}} &
+\textbf{\placeholder{...}} & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Top Concept(s): Assessment and Justification}
+\placeholder{Justify the selected concept using evidence, not only preference.
+Discuss tradeoffs, risks, expected performance, cost, manufacturability, and
+alignment with customer needs.}
+
+\subsection{Detailed Model of Top Concept(s)}
+\placeholder{Include CAD, architecture diagrams, circuit diagrams, software
+models, interface descriptions, and key dimensions.}
+
+\insertfigure{images/top-concept-cad.png}{Detailed model of the selected
+concept.}{fig:top-concept}
+
+% ============================ PROTOTYPE SUMMARY ============================
+\section{Prototype Summary}
+\subsection{Prototype Design}
+\subsubsection{Questions to Answer}
+\begin{enumerate}
+    \item \placeholder{Question about technical feasibility.}
+    \item \placeholder{Question about user interaction or workflow.}
+    \item \placeholder{Question about performance against a target specification.}
+    \item \placeholder{Question about risk, reliability, or safety.}
+\end{enumerate}
+
+\subsubsection{Design and Construction Process}
+\placeholder{Describe the prototype architecture, materials, electronics,
+software, fabrication, assembly, and integration. Explain the sequence of
+decisions and document major iterations. Include photographs with captions.}
+
+\insertfigure[0.48\textwidth]{images/prototype-overview.jpg}{Prototype
+overview.}{fig:prototype-overview}
+\insertfigure[0.48\textwidth]{images/prototype-build.jpg}{Prototype during
+construction or integration.}{fig:prototype-build}
+
+\subsection{Prototype Testing}
+\subsubsection{Test Plan}
+\placeholder{For each experiment, state the objective, setup, independent and
+dependent variables, controls, sample size, procedure, and pass/fail criterion.}
+
+\begin{table}[H]
+\centering
+\caption{Prototype test plan.}
+\label{tab:test-plan}
+\begin{tabularx}{\textwidth}{lYYYY}
+\toprule
+\textbf{Test} & \textbf{Question} & \textbf{Measured output} &
+\textbf{Pass criterion} & \textbf{Status} \\
+\midrule
+\placeholder{T1} & \placeholder{...} & \placeholder{...} &
+\placeholder{...} & \placeholder{Planned/complete} \\
+\placeholder{T2} & \placeholder{...} & \placeholder{...} &
+\placeholder{...} & \placeholder{Planned/complete} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Data Analysis}
+\placeholder{Present raw-data processing, uncertainty, summary statistics,
+comparisons to targets, and limitations. Do not show only successful trials.}
+
+\insertfigure{images/test-results.png}{Prototype test results. Replace with a
+plot generated from the measured data.}{fig:test-results}
+
+\begin{table}[H]
+\centering
+\caption{Summary of prototype test results.}
+\label{tab:test-results}
+\begin{tabularx}{\textwidth}{lYYY}
+\toprule
+\textbf{Metric} & \textbf{Target} & \textbf{Measured result} &
+\textbf{Interpretation / next action} \\
+\midrule
+\placeholder{Metric 1} & \placeholder{...} & \placeholder{...} &
+\placeholder{...} \\
+\placeholder{Metric 2} & \placeholder{...} & \placeholder{...} &
+\placeholder{...} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Design Implications}
+\placeholder{Explain how the test results changed the next design iteration,
+specifications, concept choice, risk register, or test plan.}
+
+% ============================ PROJECT PLANNING =============================
+\section{Project Planning}
+\subsection{Schedule and Gantt Chart}
+\placeholder{Summarize completed work, current work, dependencies, milestones,
+and schedule risks. Include a Gantt chart exported as a high-resolution image
+or generated in this section.}
+
+\insertfigure{images/gantt-chart.png}{Project Gantt chart.}{fig:gantt}
+
+\subsection{Prototype Planning}
+\subsubsection{Next Prototype}
+\placeholder{Provide a detailed build plan: components, dimensions, interfaces,
+fabrication steps, software work, responsible team member, cost, and expected
+completion date.}
+
+\subsubsection{Experiments}
+\placeholder{List the experiments that will be conducted on the next prototype.
+For each experiment, state the question, setup, data to collect, and decision
+rule.}
+
+\subsubsection{Expected Final Prototype Scope}
+\placeholder{Describe the features expected in the final prototype. Clearly
+separate must-have features from features deferred until a later product
+version. Explain why features were deferred.}
+
+\begin{table}[H]
+\centering
+\caption{Planned final-prototype features.}
+\label{tab:final-features}
+\begin{tabularx}{\textwidth}{lYYY}
+\toprule
+\textbf{Feature} & \textbf{Final prototype?} & \textbf{Evidence of completion} &
+\textbf{Rationale / deferral plan} \\
+\midrule
+\placeholder{Feature 1} & \placeholder{Yes/No} & \placeholder{Test/demo} &
+\placeholder{...} \\
+\placeholder{Feature 2} & \placeholder{Yes/No} & \placeholder{Test/demo} &
+\placeholder{...} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ============================== REFERENCES ===============================
+\clearpage
+\begin{thebibliography}{99}
+\bibitem{competitor1}
+\placeholder{Author or organization.}
+\emph{\placeholder{Title of source or competitor page}.}
+\url{https://example.com}, \placeholder{publication date or access date}.
+
+\bibitem{method}
+\placeholder{Add course text, design-method reference, standard, paper, or
+other source used in the report.}
+\end{thebibliography}
+
+% ============================== APPENDICES ================================
+\appendix
+\section{Individual Concept Sketches}
+\label{app:concept-sketches}
+\placeholder{Include at least one clearly labeled page or figure for each team
+member's individual concepts.}
+
+\insertfigure{images/sketch-member-1.png}{Concept sketches by
+\placeholder{Team member 1}.}{fig:sketch-member-1}
+\insertfigure{images/sketch-member-2.png}{Concept sketches by
+\placeholder{Team member 2}.}{fig:sketch-member-2}
+
+\section{Survey Instrument and Interview Questions}
+\placeholder{Include the complete survey, interview script, consent language,
+and response scale. Do not include personally identifying information unless
+permission has been obtained.}
+
+\begin{enumerate}
+    \item \placeholder{Question 1}
+    \item \placeholder{Question 2}
+    \item \placeholder{Question 3}
+\end{enumerate}
+
+\section{Work Distribution}
+\placeholder{Describe each team member's specific contribution to design
+exercises, prototyping, testing, analysis, and report writing.}
+
+\begin{longtable}{p{0.2\textwidth}p{0.36\textwidth}p{0.36\textwidth}}
+\caption{Work distribution.}\label{tab:work-distribution}\\
+\toprule
+\textbf{Team member} & \textbf{Design/prototyping contribution} &
+\textbf{Report contribution} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Team member} & \textbf{Design/prototyping contribution} &
+\textbf{Report contribution} \\
+\midrule
+\endhead
+\placeholder{Name 1} & \placeholder{Specific tasks} & \placeholder{Sections,
+figures, analysis, editing} \\
+\placeholder{Name 2} & \placeholder{Specific tasks} & \placeholder{Sections,
+figures, analysis, editing} \\
+\placeholder{Name 3} & \placeholder{Specific tasks} & \placeholder{Sections,
+figures, analysis, editing} \\
+\placeholder{Name 4} & \placeholder{Specific tasks} & \placeholder{Sections,
+figures, analysis, editing} \\
+\bottomrule
+\end{longtable}
+
+\section{Additional Supporting Material}
+\placeholder{Add detailed calculations, complete raw data, risk register,
+additional concept sketches, CAD drawings, code excerpts, or other material
+that supports the report but would interrupt the main narrative.}
+
+\end{document}
