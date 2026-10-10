@@ -1,5 +1,18 @@
 \documentclass[11pt,letterpaper]{article}
 
+% ========================== QUICK FORMATTING GUIDE =========================
+% Change the values below to adjust heading sizes:
+%   \sectionsize   = numbered section titles in the main report
+%   \referencesize = the References heading
+%   \appendixsize  = printed Appendix headings
+% The first value is the font size; the second is the line height. For example:
+%   \fontsize{15pt}{18pt}\selectfont\bfseries
+% The report body font size is set in the first line above: 11pt.
+% The report line spacing is controlled by \setstretch{1.15} below.
+% The Appendix labels in the table of contents use \appendixtocnumwidth below.
+% Increase it if "Appendix A:" is too close to the appendix title.
+% ============================================================================
+
 % --------------------------------------------------------------------------
 % MOLE mid-semester design report template
 % Replace text in angle brackets and the example rows in tables as the project
@@ -25,6 +38,8 @@
 \usepackage{xcolor}
 \usepackage{fancyhdr}
 \usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{etoolbox}
 \usepackage{hyperref}
 \usepackage{url}
 
@@ -54,6 +69,17 @@
 
 \titleformat{\section}{\large\bfseries}{\thesection}{0.75em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.75em}{}
+
+% These sizes are intentionally defined separately so they can be changed
+% without affecting the body section headings.
+\newcommand{\sectionsize}{\fontsize{18pt}{22pt}\selectfont\bfseries}
+\newcommand{\referencesize}{\fontsize{18pt}{22pt}\selectfont\bfseries}
+\newcommand{\appendixsize}{\fontsize{18pt}{22pt}\selectfont\bfseries}
+\titleformat{\section}{\sectionsize}{\thesection}{0.75em}{}
+\pretocmd{\section}{\clearpage}{}{}
+\renewcommand{\refname}{\referencesize References}
+\newlength{\appendixtocnumwidth}
+\setlength{\appendixtocnumwidth}{1.35in}
 
 % ---------- Project-specific placeholders ----------
 \newcommand{\projecttitle}{Multirotor-Operated Lab Experiments (M.O.L.E.)}
@@ -108,7 +134,7 @@
 \clearpage
 
 % ========================== EXECUTIVE SUMMARY =============================
-\section*{Executive Summary}
+\section*{Executive Summary (1 page)}
 \addcontentsline{toc}{section}{Executive Summary}
 \textbf{Problem.} \placeholder{In one paragraph, state the user problem, operating
 context, and why it matters.}
@@ -129,7 +155,7 @@ an abstract of the full report.}
 \clearpage
 
 % =========================== PROBLEM DEFINITION ===========================
-\section{Problem Definition}
+\section{Problem Definition (2 pages)}
 \subsection{Problem Description}
 \placeholder{Describe the problem in measurable terms. Explain the current
 workflow, the users affected, the environment in which the system operates,
@@ -177,7 +203,7 @@ existing solution. Replace the filename and cite the source.}{fig:competitor}
 \end{itemize}
 
 % ===================== STAKEHOLDERS AND CUSTOMER NEEDS ====================
-\section{Stakeholders and Customer Needs}
+\section{Stakeholders and Customer Needs (3 pages)}
 \subsection{Stakeholder Identification}
 \placeholder{List primary users, customers, operators, maintainers, instructors,
 administrators, suppliers, regulators, and other parties affected by the
@@ -236,7 +262,7 @@ de-duplicated, and organized by user, function, or priority.}
 \end{longtable}
 
 % =========================== TARGET SPECIFICATIONS =======================
-\section{Target Specifications}
+\section{Target Specifications (2 pages)}
 \subsection{Mapping Needs to Metrics}
 \placeholder{Explain how each important need was translated into a measurable
 engineering metric, including units, direction of improvement, and test method.}
@@ -283,7 +309,7 @@ gaps and opportunities rather than only listing features.}
 \end{table}
 
 % ============================ CONCEPT GENERATION ==========================
-\section{Concept Generation}
+\section{Concept Generation(3 pages)}
 \subsection{Functional Decomposition}
 \placeholder{Define the overall system function and decompose it into
 subfunctions. A block diagram should show inputs, outputs, flows, and system
@@ -333,7 +359,7 @@ principle, advantages, risks, and unresolved questions.}
 considered.}{fig:system-concepts}
 
 % ============================ CONCEPT SELECTION ============================
-\section{Concept Selection}
+\section{Concept Selection (2 pages)}
 \subsection{Selection Process}
 \placeholder{Describe screening, feasibility checks, a Pugh matrix, weighted
 decision matrix, or other methods. Explain criteria, weights, scoring scale,
@@ -376,7 +402,7 @@ models, interface descriptions, and key dimensions.}
 concept.}{fig:top-concept}
 
 % ============================ PROTOTYPE SUMMARY ============================
-\section{Prototype Summary}
+\section{Prototype Summary (5 pages)}
 \subsection{Prototype Design}
 \subsubsection{Questions to Answer}
 \begin{enumerate}
@@ -447,7 +473,7 @@ plot generated from the measured data.}{fig:test-results}
 specifications, concept choice, risk register, or test plan.}
 
 % ============================ PROJECT PLANNING =============================
-\section{Project Planning}
+\section{Project Planning (2 pages)}
 \subsection{Schedule and Gantt Chart}
 \placeholder{Summarize completed work, current work, dependencies, milestones,
 and schedule risks. Include a Gantt chart exported as a high-resolution image
@@ -503,8 +529,23 @@ other source used in the report.}
 
 % ============================== APPENDICES ================================
 \appendix
-\section{Individual Concept Sketches}
-\label{app:concept-sketches}
+% Keep the TOC entry and the printed heading consistent: Appendix A, Appendix
+% B, etc. are written explicitly rather than being generated as a section
+% number, which otherwise causes duplicated or malformed TOC labels.
+\renewcommand{\thesection}{\Alph{section}}
+\addtocontents{toc}{%
+    \protect\setlength{\protect\cftsecnumwidth}{\appendixtocnumwidth}}%
+\newcommand{\appendixsection}[2]{%
+    \clearpage
+    \refstepcounter{section}%
+    \phantomsection
+    \addcontentsline{toc}{section}{Appendix \thesection: #1}%
+    \par\vspace*{0.5\baselineskip}%
+    {\appendixsize Appendix \thesection: #1\par}%
+    \label{#2}%
+}
+
+\appendixsection{Individual Concept Sketches}{app:concept-sketches}
 \placeholder{Include at least one clearly labeled page or figure for each team
 member's individual concepts.}
 
@@ -513,7 +554,7 @@ member's individual concepts.}
 \insertfigure{images/sketch-member-2.png}{Concept sketches by
 \placeholder{Team member 2}.}{fig:sketch-member-2}
 
-\section{Survey Instrument and Interview Questions}
+\appendixsection{Survey Instrument and Interview Questions}{app:survey}
 \placeholder{Include the complete survey, interview script, consent language,
 and response scale. Do not include personally identifying information unless
 permission has been obtained.}
@@ -524,7 +565,7 @@ permission has been obtained.}
     \item \placeholder{Question 3}
 \end{enumerate}
 
-\section{Work Distribution}
+\appendixsection{Work Distribution}{app:work-distribution}
 \placeholder{Describe each team member's specific contribution to design
 exercises, prototyping, testing, analysis, and report writing.}
 
@@ -551,7 +592,7 @@ figures, analysis, editing} \\
 \bottomrule
 \end{longtable}
 
-\section{Additional Supporting Material}
+\appendixsection{Additional Supporting Material}{app:supporting-material}
 \placeholder{Add detailed calculations, complete raw data, risk register,
 additional concept sketches, CAD drawings, code excerpts, or other material
 that supports the report but would interrupt the main narrative.}
