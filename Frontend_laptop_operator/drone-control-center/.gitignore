@@ -1,0 +1,23 @@
+# JavaScript dependencies and build output
+node_modules/
+dist/
+
+# Python environments and caches
+.venv/
+__pycache__/
+*.py[cod]
+
+# Runtime logs and generated test output
+logs/
+laptop_backend/control_center_io.jsonl
+
+# Local environment files
+.env
+!.env.example
+
+# LaTeX generated files
+*.aux
+*.log
+*.out
+*.synctex.gz
+

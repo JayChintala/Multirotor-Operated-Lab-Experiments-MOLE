@@ -1,0 +1,595 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{parskip}
+
+\definecolor{codegray}{RGB}{245,245,245}
+\definecolor{darkblue}{RGB}{25,65,105}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=darkblue,
+  urlcolor=darkblue,
+  pdftitle={Drone Control Center System Understanding Guide}
+}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codegray},
+  frame=single,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false
+}
+
+\title{Drone Control Center\\System Understanding Guide}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{System Architecture}
+
+This repository contains two browser applications and a shared Python laptop
+backend:
+
+\begin{itemize}[leftmargin=*]
+  \item \texttt{control\_center/}: the active Drone Control Center with the
+  camera, water-contact, trajectory, telemetry, control-log, and valve-trigger
+  interfaces.
+  \item \texttt{current\_frontend/}: the older standalone control interface
+  with flight sliders, Pico outputs, telemetry, connection controls, and a
+  protocol preview.
+  \item \texttt{laptop\_backend/}: the WebSocket-to-UDP bridge between the
+  browser and Raspberry Pi.
+\end{itemize}
+
+\subsection{Runtime data flow}
+
+\begin{lstlisting}
+Synthetic or real camera producer
+        |
+        | WebSocket JSON, normally ws://127.0.0.1:8765
+        v
+Laptop backend: laptop_backend/control_center_backend.py
+        ^
+        | WebSocket JSON, ws://127.0.0.1:5173
+        v
+Browser UI: control_center/
+        |
+        | UDP JSON controls and triggers, port 5000
+        v
+Raspberry Pi gateway
+        |                    |
+        | MAVLink             | SPI
+        v                    v
+Flight controller          Pico
+        ^
+        |
+        | UDP JSON telemetry, port 5001
+        |
+Laptop backend
+\end{lstlisting}
+
+The browser does not communicate directly with the Raspberry Pi. It connects
+to the laptop backend over WebSocket. The backend validates and forwards
+control and trigger messages as UDP JSON packets, and broadcasts incoming Pi
+telemetry back to connected browsers.
+
+\subsection{Video path}
+
+The video producer sends a \texttt{VIDEO\_FRAME} message to the backend:
+
+\begin{lstlisting}
+{
+  "type": "VIDEO_FRAME",
+  "seq": 12,
+  "time_ms": 1727483000123,
+  "content_type": "image/jpeg",
+  "data": "<base64 JPEG>",
+  "water_contact": true,
+  "sensors": {
+    "water_detected": true
+  }
+}
+\end{lstlisting}
+
+The backend validates JPEG, PNG, or WebP frames and relays them to browser
+clients through port 5173. The active frontend converts the base64 payload to
+a browser data URL and displays it. The water-contact box becomes green when
+either \texttt{water\_contact} or \texttt{sensors.water\_detected} is true.
+
+The bundled Gaussian-noise producer is only a development/test camera. It
+defaults to reporting water detected and supports
+\texttt{--no-water-detected} for testing the inactive state.
+
+\subsection{Control path}
+
+The browser sends \texttt{CONTROL} messages containing normalized flight axes
+and four Pico outputs:
+
+\begin{lstlisting}
+{
+  "version": 1,
+  "type": "CONTROL",
+  "flight": {
+    "roll": 0.2,
+    "pitch": -0.1,
+    "yaw": 0.05,
+    "throttle": 0.3
+  },
+  "pico": {
+    "output0": 100,
+    "output1": 0,
+    "output2": -200,
+    "output3": 50
+  }
+}
+\end{lstlisting}
+
+The backend validates flight values from \(-1.0\) to \(1.0\), requires
+non-negative throttle, validates Pico values from \(-1000\) to \(1000\), adds
+its own sequence number, and forwards the packet to the Pi.
+
+The active keyboard mapping is:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Input} & \textbf{Control}\\
+\midrule
+\texttt{W} & Positive pitch\\
+\texttt{S} & Negative pitch\\
+\texttt{A} & Negative roll\\
+\texttt{D} & Positive roll\\
+Up arrow & Positive throttle\\
+Down arrow & Negative throttle, subject to validation\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The browser emits controls at 20~Hz. This is a human-in-the-loop interface,
+not a hard-real-time flight stabilization loop.
+
+\subsection{Valve trigger path}
+
+The active interface has a 2-by-2 valve grid:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Valve 1 ON & Valve 2 ON\\
+Valve 1 OFF & Valve 2 OFF\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The buttons send \texttt{TRIGGER} messages with one of:
+\texttt{valve\_1\_on}, \texttt{valve\_2\_on},
+\texttt{valve\_1\_off}, or \texttt{valve\_2\_off}. The Pi gateway must map
+these names to the appropriate GPIO, Pico, or actuator operation.
+
+\subsection{Telemetry path}
+
+The Pi sends \texttt{TELEMETRY} JSON datagrams to the laptop's UDP port 5001.
+The backend adds \texttt{bridge\_received\_time\_ms}, tracks telemetry age,
+and broadcasts the message to browser clients.
+
+Telemetry may contain flight mode, armed state, attitude, acceleration,
+angular velocity, position, battery, ultrasonic readings, water status, and
+other sensors. The active UI uses the flight-controller fields for the IMU,
+trajectory, and status panels while preserving additional fields in transit.
+
+\section{File Responsibilities}
+
+\subsection{\texttt{laptop\_backend/}}
+
+\begin{longtable}{p{0.32\textwidth}p{0.62\textwidth}}
+\toprule
+\textbf{File} & \textbf{Responsibility}\\
+\midrule
+\texttt{control\_center\_backend.py} &
+Main laptop bridge. Runs the browser WebSocket server, validates controls and
+triggers, sends UDP commands to the Pi, receives UDP telemetry, connects to
+the video producer, validates frames, relays video, and reports bridge status.\\
+\texttt{test\_control\_center\_io.py} &
+Bench-test harness. Sends neutral controls and synthetic telemetry, receives
+backend messages, and records JSON Lines logs. It does not control real
+hardware.\\
+\texttt{requirements.txt} &
+Python dependency declaration, primarily the \texttt{websockets} package.\\
+\texttt{.env.example} &
+Example network settings and configuration reference.\\
+\texttt{control\_center\_io.jsonl} &
+Generated test log, not application source.\\
+\bottomrule
+\end{longtable}
+
+Important backend options are:
+
+\begin{lstlisting}
+--pi-ip             Raspberry Pi address; default 192.168.1.50
+--pi-control-port   Pi command UDP port; default 5000
+--telemetry-port   Laptop telemetry UDP port; default 5001
+--host              Browser WebSocket bind host; default 127.0.0.1
+--port              Browser WebSocket port; default 5173
+--video-url         Camera producer WebSocket; default ws://127.0.0.1:8765
+\end{lstlisting}
+
+\subsection{\texttt{current\_frontend/}}
+
+This is the older React/Vite application.
+
+\begin{longtable}{p{0.32\textwidth}p{0.62\textwidth}}
+\toprule
+\textbf{File} & \textbf{Responsibility}\\
+\midrule
+\texttt{src/main.jsx} & React bootstrap and root mounting.\\
+\texttt{src/App.jsx} &
+Connection form, automatic reconnect, flight sliders, Pico outputs,
+telemetry, link statistics, protocol preview, and event log.\\
+\texttt{src/styles.css} & Layout, cards, controls, telemetry, and status styles.\\
+\texttt{index.html} & Vite HTML entry point.\\
+\texttt{vite.config.js} & Binds this application to \texttt{127.0.0.1:6970}.\\
+\texttt{package.json} & npm scripts and React/Vite dependencies.\\
+\bottomrule
+\end{longtable}
+
+Its default backend URL is \texttt{ws://127.0.0.1:5173}, stored in browser
+local storage under \texttt{wsUrl}. This frontend is not the active
+camera/water/valve interface.
+
+\subsection{\texttt{control\_center/}}
+
+\begin{longtable}{p{0.32\textwidth}p{0.62\textwidth}}
+\toprule
+\textbf{File} & \textbf{Responsibility}\\
+\midrule
+\texttt{src/main.tsx} &
+Active UI, backend WebSocket client, video rendering, water signal handling,
+IMU and trajectory views, keyboard controls, telemetry, logs, and valve
+triggers.\\
+\texttt{src/style.css} &
+Full-screen two-column layout, camera, IMU, trajectory, water panel, and
+2-by-2 valve grid styling.\\
+\texttt{gaussian\_video\_server.py} &
+Synthetic JPEG video WebSocket producer with optional water detection signal.\\
+\texttt{index.html} & Vite HTML entry point.\\
+\texttt{vite.config.ts} & Binds the active frontend to \texttt{127.0.0.1:6969}.\\
+\texttt{package.json} & npm scripts and active React/Vite dependencies.\\
+\texttt{requirements.txt} & Python dependencies for the synthetic video server.\\
+\bottomrule
+\end{longtable}
+
+\section{Ports and Protocols}
+
+\begin{longtable}{rllp{0.43\textwidth}}
+\toprule
+\textbf{Port} & \textbf{Transport} & \textbf{Endpoints} & \textbf{Meaning}\\
+\midrule
+6969 & TCP/HTTP & Vite $\rightarrow$ browser &
+Serves the active \texttt{control\_center/} application.\\
+6970 & TCP/HTTP & Vite $\rightarrow$ browser &
+Serves the older \texttt{current\_frontend/} application.\\
+5173 & TCP/WebSocket & Browser $\leftrightarrow$ laptop &
+Controls, triggers, bridge status, telemetry, errors, and relayed video.\\
+8765 & TCP/WebSocket & Producer $\rightarrow$ laptop &
+Synthetic or real camera \texttt{VIDEO\_FRAME} source.\\
+5000 & UDP & Laptop $\rightarrow$ Pi &
+Validated \texttt{CONTROL} and \texttt{TRIGGER} JSON datagrams.\\
+5001 & UDP & Pi $\rightarrow$ laptop &
+\texttt{TELEMETRY} JSON datagrams.\\
+\bottomrule
+\end{longtable}
+
+Port 6969 and 6970 are HTTP development servers, not control ports. Port
+5173 is the browser protocol endpoint. Port 8765 is used by the backend as a
+camera input. UDP is connectionless, so it does not guarantee delivery,
+ordering, or retransmission. Sequence numbers, timestamps, and Pi-side
+watchdogs are therefore important.
+
+Individual WebSocket messages must remain below the backend's 2~MiB message
+limit. Base64 video increases payload size, so real camera resolutions and
+quality settings may need to be reduced.
+
+\subsection{Port and address reference}
+
+The active \texttt{control\_center/} frontend is served at
+\texttt{http://127.0.0.1:6969}. The older \texttt{current\_frontend/}
+frontend is served at \texttt{http://127.0.0.1:6970}. In the current
+configuration, both browser applications connect to the laptop backend at
+\texttt{ws://127.0.0.1:5173}; these loopback addresses refer to services on
+the laptop itself.
+
+The complete data flow is:
+
+\begin{lstlisting}
+Browser
+  | HTTP :6969 or :6970
+  v
+Frontend application
+  | WebSocket ws://127.0.0.1:5173
+  v
+Laptop backend
+  | UDP 192.168.1.50:5000
+  v
+Raspberry Pi
+
+Raspberry Pi
+  | UDP <laptop-Ethernet-IP>:5001
+  v
+Laptop backend
+  | WebSocket broadcast :5173
+  v
+Browser
+
+Video producer
+  | WebSocket :8765
+  v
+Laptop backend
+\end{lstlisting}
+
+For a direct Ethernet connection, a typical static configuration is
+\texttt{192.168.1.10} for the laptop Ethernet adapter and
+\texttt{192.168.1.50} for the Raspberry Pi, with subnet mask
+\texttt{255.255.255.0}. The backend sends control and trigger packets to the
+Pi at \texttt{192.168.1.50:5000}. The Pi sends telemetry to the laptop's
+Ethernet address, for example \texttt{192.168.1.10:5001}; it must not send
+telemetry to \texttt{127.0.0.1}, which refers to the Pi itself.
+
+The backend's default video URL is \texttt{ws://127.0.0.1:8765}, which is
+appropriate when the producer runs on the laptop. If the producer runs on the
+Pi, configure \texttt{--video-url ws://192.168.1.50:8765} instead. The
+laptop firewall must allow inbound UDP traffic on port 5001 for Pi telemetry.
+
+\section{Test Scripts and Functions}
+
+\subsection{\texttt{test\_control\_center\_io.py}}
+
+Run it from \texttt{laptop\_backend/} after starting the backend:
+
+\begin{lstlisting}
+..\.venv\Scripts\python.exe test_control_center_io.py ^
+  --duration 10 ^
+  --rate-hz 10 ^
+  --output .\control_center_io.jsonl
+\end{lstlisting}
+
+\begin{description}[leftmargin=!,labelwidth=0.28\textwidth]
+\item[\texttt{EventLog}] Opens the JSONL file, writes timestamped events, and
+closes the file.
+\item[\texttt{telemetry\_packet}] Creates deterministic changing telemetry
+using sine and cosine values for attitude, position, and sensors.
+\item[\texttt{control\_packet}] Creates neutral flight and Pico controls.
+\item[\texttt{send\_telemetry}] Sends synthetic telemetry UDP datagrams at
+the selected rate and duration.
+\item[\texttt{exercise\_websocket}] Connects to the backend, sends
+\texttt{CONFIG} and controls, receives messages, and logs all activity.
+\item[\texttt{run}] Runs the WebSocket and UDP tests concurrently.
+\end{description}
+
+This harness tests control, telemetry, and logging. It does not test real
+camera hardware or physical valve actuation.
+
+\subsection{\texttt{gaussian\_video\_server.py}}
+
+\begin{lstlisting}
+..\.venv\Scripts\python.exe gaussian_video_server.py
+..\.venv\Scripts\python.exe gaussian_video_server.py --no-water-detected
+\end{lstlisting}
+
+The main functions are:
+
+\begin{description}[leftmargin=!,labelwidth=0.28\textwidth]
+\item[\texttt{create\_noise\_frame}] Generates and base64-encodes one JPEG.
+\item[\texttt{stream\_video}] Sends frames at the configured FPS.
+\item[\texttt{handle\_client}] Handles one connected backend client.
+\item[\texttt{run\_server}] Starts the video WebSocket server.
+\item[\texttt{parse\_args}] Parses host, port, dimensions, FPS, and water state.
+\end{description}
+
+This is a development producer, not a real camera driver.
+
+\section{Complete Run Order}
+
+\subsection{First-time setup}
+
+\begin{lstlisting}
+cd C:\Users\ASUS\Desktop\CMU\Sem1\EMSD\Frontend\drone-control-center
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r laptop_backend\requirements.txt
+python -m pip install -r control_center\requirements.txt
+\end{lstlisting}
+
+Install JavaScript dependencies in both applications:
+
+\begin{lstlisting}
+cd control_center
+npm install
+cd ..\current_frontend
+npm install
+\end{lstlisting}
+
+\subsection{Start services}
+
+\begin{enumerate}
+\item Start the synthetic video producer:
+\begin{lstlisting}
+cd control_center
+..\.venv\Scripts\python.exe gaussian_video_server.py
+\end{lstlisting}
+
+\item Start the laptop backend:
+\begin{lstlisting}
+cd ..\laptop_backend
+..\.venv\Scripts\python.exe control_center_backend.py --pi-ip 127.0.0.1
+\end{lstlisting}
+For real hardware, replace \texttt{127.0.0.1} with the Pi address.
+
+\item Start the active UI:
+\begin{lstlisting}
+cd ..\control_center
+npm run dev
+\end{lstlisting}
+Open \url{http://127.0.0.1:6969}.
+
+\item Optionally start the older UI:
+\begin{lstlisting}
+cd ..\current_frontend
+npm run dev
+\end{lstlisting}
+Open \url{http://127.0.0.1:6970} and verify its WebSocket URL is
+\texttt{ws://127.0.0.1:5173}.
+
+\item Optionally run the I/O harness:
+\begin{lstlisting}
+cd ..\laptop_backend
+..\.venv\Scripts\python.exe test_control_center_io.py --duration 10 --rate-hz 10
+\end{lstlisting}
+\end{enumerate}
+
+\subsection{Safe bench-test order}
+
+\begin{enumerate}
+\item Remove propellers and keep the vehicle disarmed.
+\item Start the Pi gateway with actuators disabled.
+\item Start the backend with the correct Pi address.
+\item Verify browser-to-backend connectivity.
+\item Verify telemetry and increasing sequence numbers.
+\item Test safe Pico outputs.
+\item Test valves in a physically safe setup.
+\item Connect flight-controller functionality while disarmed.
+\item Add real video and validate the camera path.
+\end{enumerate}
+
+\section{Interfacing with a Raspberry Pi}
+
+\subsection{Pi gateway responsibilities}
+
+The Raspberry Pi needs a gateway program that:
+
+\begin{enumerate}
+\item Listens for UDP JSON commands on port 5000.
+\item Parses and validates \texttt{CONTROL} and \texttt{TRIGGER} packets.
+\item Maps flight commands to MAVLink or the selected flight API.
+\item Maps Pico values to SPI.
+\item Maps valve names to GPIO, Pico, or actuator operations.
+\item Reads flight-controller, GPS, battery, ultrasonic, and water sensors.
+\item Sends \texttt{TELEMETRY} JSON to the laptop on UDP port 5001.
+\item Enforces a control timeout and safe actuator state.
+\end{enumerate}
+
+The Pi should own safety-critical behavior. The browser and laptop are
+operator and networking layers, not the stabilization loop.
+
+\subsection{Network configuration}
+
+Give the Pi a reachable address, preferably with a DHCP reservation or static
+configuration. Start the backend with:
+
+\begin{lstlisting}
+..\.venv\Scripts\python.exe control_center_backend.py ^
+  --pi-ip 192.168.1.50 ^
+  --pi-control-port 5000 ^
+  --telemetry-port 5001
+\end{lstlisting}
+
+The laptop firewall must allow inbound UDP port 5001. The Pi must be able to
+send telemetry to the laptop's IP address.
+
+\subsection{Pi command receiver}
+
+The Pi gateway should dispatch by message type:
+
+\begin{lstlisting}[language=Python]
+if message["type"] == "CONTROL":
+    # Validate version, ranges, sequence, timestamp, and freshness.
+    # Send flight values to the flight controller.
+    # Send Pico values over SPI.
+elif message["type"] == "TRIGGER":
+    # Dispatch valve_1_on, valve_2_on,
+    # valve_1_off, and valve_2_off.
+\end{lstlisting}
+
+Recommended Pi-side checks include:
+
+\begin{itemize}
+\item Reject unknown protocol versions.
+\item Reject non-finite, out-of-range, or stale values.
+\item Track sequence numbers and detect packet gaps.
+\item Use a watchdog timeout and return actuators to a safe state.
+\item Keep emergency behavior local to the Pi.
+\end{itemize}
+
+\subsection{Pi telemetry}
+
+The Pi should send packets containing at least:
+
+\begin{lstlisting}
+{
+  "version": 1,
+  "type": "TELEMETRY",
+  "seq": 42,
+  "time_ms": 1727483000123,
+  "fc": {
+    "flight_mode": "STABILIZE",
+    "armed": false,
+    "attitude": {"roll": 0.0, "pitch": 0.0, "yaw": 0.0},
+    "position": {"lat": 40.4432, "lon": -79.9436, "alt": 12.0},
+    "battery": {"voltage_v": 15.8, "remaining_percent": 87}
+  },
+  "water_contact": false,
+  "sensors": {"water_detected": false}
+}
+\end{lstlisting}
+
+Send this datagram to \texttt{<laptop-ip>:5001}. The backend forwards it to
+all browser clients.
+
+\subsection{Real camera integration}
+
+A real camera producer should capture frames, encode them as JPEG, PNG, or
+WebP, base64-encode the image, and publish \texttt{VIDEO\_FRAME} messages to a
+WebSocket endpoint. Configure the backend with:
+
+\begin{lstlisting}
+..\.venv\Scripts\python.exe control_center_backend.py ^
+  --pi-ip 192.168.1.50 ^
+  --video-url ws://192.168.1.50:8765
+\end{lstlisting}
+
+Keep serialized messages below 2~MiB. If full-resolution frames exceed this
+limit, reduce resolution or quality, or replace base64 JSON with a video
+transport designed for continuous media.
+
+\subsection{Recommended integration sequence}
+
+\begin{enumerate}
+\item Verify the laptop backend and browser locally.
+\item Verify the I/O harness and synthetic telemetry.
+\item Implement a Pi UDP receiver and send harmless telemetry.
+\item Confirm telemetry appears in the UI.
+\item Send neutral controls and verify Pi sequence numbers.
+\item Test safe Pico output values.
+\item Implement and test valve mapping.
+\item Connect the flight controller while disarmed.
+\item Add real camera streaming.
+\item Validate watchdog and failsafe behavior.
+\end{enumerate}
+
+\end{document}
