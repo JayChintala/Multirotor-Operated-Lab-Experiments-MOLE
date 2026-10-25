@@ -1,0 +1,455 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue
+}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    frame=single,
+    breaklines=true,
+    columns=fullflexible
+}
+
+\title{Network Protocols for the Drone Control System}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{System Overview}
+
+The drone control system contains three main software components:
+
+\begin{enumerate}[leftmargin=*]
+    \item The \texttt{current\_frontend} React application running in a browser.
+    \item The laptop backend, which acts as a WebSocket-to-UDP bridge.
+    \item A Raspberry Pi connected to the laptop through an Ethernet cable.
+\end{enumerate}
+
+The frontend communicates with the laptop backend. The backend translates
+browser messages into UDP packets for the Raspberry Pi and translates
+telemetry packets from the Raspberry Pi back into WebSocket messages for the
+browser.
+
+\begin{lstlisting}
+Browser frontend
+    | WebSocket: ws://127.0.0.1:5173
+    v
+Laptop backend
+    | UDP over Ethernet: Pi port 5000
+    v
+Raspberry Pi
+\end{lstlisting}
+
+\section{Ports and Addresses}
+
+The relevant default settings are:
+
+\begin{center}
+\begin{tabular}{>{\ttfamily}l l l}
+\toprule
+\textnormal{Component or traffic} & \textnormal{Address/port} & \textnormal{Purpose} \\
+\midrule
+Frontend development server & \texttt{127.0.0.1:6970} & Browser page \\
+Frontend to backend & \texttt{ws://127.0.0.1:5173} & WebSocket control connection \\
+Laptop to Raspberry Pi & \texttt{192.168.1.50:5000/UDP} & Control and trigger packets \\
+Raspberry Pi to laptop & \texttt{<laptop-ip>:5001/UDP} & Telemetry packets \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The frontend is opened at:
+
+\begin{lstlisting}
+http://127.0.0.1:6970
+\end{lstlisting}
+
+The backend listens for browser WebSocket connections at:
+
+\begin{lstlisting}
+ws://127.0.0.1:5173
+\end{lstlisting}
+
+The frontend does not communicate directly with the Raspberry Pi. The
+backend performs that translation.
+
+\section{Ethernet Configuration}
+
+When the laptop is connected directly to the Raspberry Pi with an Ethernet
+cable, both devices need compatible IP addresses on the same subnet. A
+recommended static configuration is:
+
+\begin{center}
+\begin{tabular}{l l}
+\toprule
+Device & IPv4 configuration \\
+\midrule
+Laptop Ethernet adapter & IP address \texttt{192.168.1.10} \\
+Raspberry Pi Ethernet & IP address \texttt{192.168.1.50} \\
+Both devices & Subnet mask \texttt{255.255.255.0} \\
+Both devices & No gateway required for a direct cable \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The laptop can test basic reachability with:
+
+\begin{lstlisting}
+ping 192.168.1.50
+\end{lstlisting}
+
+The existing backend defaults to the Raspberry Pi address
+\texttt{192.168.1.50}. If a different address is used, start the backend with
+the appropriate value:
+
+\begin{lstlisting}
+..\.venv\Scripts\python.exe control_center_backend.py --pi-ip 192.168.1.50
+\end{lstlisting}
+
+The backend should print messages similar to:
+
+\begin{lstlisting}
+WebSocket: ws://127.0.0.1:5173
+Pi UDP target: 192.168.1.50:5000
+Telemetry UDP listen: 0.0.0.0:5001
+\end{lstlisting}
+
+\section{Control Data Flow}
+
+The frontend sends control messages through its WebSocket connection to the
+backend. The backend handles these messages in
+\texttt{browser\_handler()}.
+
+For a \texttt{CONTROL} message, the backend:
+
+\begin{enumerate}[leftmargin=*]
+    \item Parses the incoming JSON.
+    \item Checks that the message version is supported.
+    \item Validates roll, pitch, yaw, and throttle values.
+    \item Validates the Pico output values.
+    \item Adds a sequence number and timestamp.
+    \item Serializes the resulting packet as compact UTF-8 JSON.
+    \item Sends the bytes to the Raspberry Pi using UDP.
+\end{enumerate}
+
+The UDP destination is configured by:
+
+\begin{lstlisting}
+--pi-ip           192.168.1.50
+--pi-control-port 5000
+\end{lstlisting}
+
+The backend uses a datagram socket and sends the packet with
+\texttt{sendto()}:
+
+\begin{lstlisting}
+payload = json.dumps(message, separators=(",", ":")).encode("utf-8")
+self.control_socket.sendto(payload, (self.pi_ip, self.pi_control_port))
+\end{lstlisting}
+
+A control packet has the following general form:
+
+\begin{lstlisting}
+{
+  "version": 1,
+  "type": "CONTROL",
+  "seq": 42,
+  "time_ms": 1728970000000,
+  "flight": {
+    "roll": 0.0,
+    "pitch": 0.2,
+    "yaw": 0.0,
+    "throttle": 0.5
+  },
+  "pico": {
+    "output0": 0,
+    "output1": 0,
+    "output2": 0,
+    "output3": 0
+  }
+}
+\end{lstlisting}
+
+Trigger commands use the same UDP path. An example is:
+
+\begin{lstlisting}
+{
+  "version": 1,
+  "type": "TRIGGER",
+  "name": "valve_1_on",
+  "time_ms": 1728970000000
+}
+\end{lstlisting}
+
+The Raspberry Pi must run a UDP receiver listening on port 5000, conceptually:
+
+\begin{lstlisting}
+sock.bind(("0.0.0.0", 5000))
+\end{lstlisting}
+
+\section{Telemetry Data Flow}
+
+Communication is bidirectional. The Raspberry Pi can transmit data to the
+laptop over the same Ethernet cable.
+
+\begin{lstlisting}
+Raspberry Pi
+    | UDP to 192.168.1.10:5001
+    v
+Laptop backend
+    | WebSocket broadcast
+    v
+Browser frontend
+\end{lstlisting}
+
+The backend listens on all laptop interfaces at UDP port 5001:
+
+\begin{lstlisting}
+self.telemetry_socket.bind(("0.0.0.0", telemetry_port))
+\end{lstlisting}
+
+The Raspberry Pi must send telemetry to the laptop's Ethernet IP, not to
+\texttt{127.0.0.1}. If the laptop Ethernet address is
+\texttt{192.168.1.10}, the destination is:
+
+\begin{lstlisting}
+192.168.1.10:5001/UDP
+\end{lstlisting}
+
+The backend's telemetry loop:
+
+\begin{enumerate}[leftmargin=*]
+    \item Receives a UDP datagram.
+    \item Decodes the UTF-8 JSON.
+    \item Checks that its type is \texttt{TELEMETRY}.
+    \item Adds a bridge-received timestamp.
+    \item Broadcasts the telemetry to connected browser clients.
+\end{enumerate}
+
+An example telemetry packet is:
+
+\begin{lstlisting}
+{
+  "version": 1,
+  "type": "TELEMETRY",
+  "seq": 123,
+  "fc": {
+    "flight_mode": "STABILIZE",
+    "armed": false,
+    "battery": {
+      "voltage": 11.8,
+      "percentage": 82
+    },
+    "attitude": {
+      "roll": 0.01,
+      "pitch": -0.02,
+      "yaw": 1.57
+    }
+  }
+}
+\end{lstlisting}
+
+The laptop firewall must permit inbound UDP traffic on port 5001. Otherwise,
+the Raspberry Pi may transmit packets that Windows blocks before the backend
+can receive them.
+
+\section{What UDP Is}
+
+UDP, or User Datagram Protocol, is a lightweight transport protocol. It sends
+individual datagrams without first establishing a persistent connection.
+Each datagram contains the destination address and port and is transmitted
+independently.
+
+UDP does not automatically guarantee:
+
+\begin{itemize}[leftmargin=*]
+    \item delivery,
+    \item ordering,
+    \item duplicate prevention,
+    \item retransmission, or
+    \item confirmation that the receiving application processed the packet.
+\end{itemize}
+
+This differs from TCP, which establishes a connection and provides ordered,
+reliable delivery by retransmitting missing data.
+
+\section{Why UDP Fits Control and Telemetry}
+
+Flight-control and telemetry streams are continuously updated. The newest
+state is normally more useful than an older state that arrives late.
+
+For example:
+
+\begin{lstlisting}
+t = 0 ms:    throttle = 0.30
+t = 50 ms:   throttle = 0.35
+t = 100 ms:  throttle = 0.40
+\end{lstlisting}
+
+If the first packet is delayed, retransmitting it after the third packet may
+be undesirable. UDP avoids transport-level retransmission of stale data and
+has low overhead.
+
+UDP is suitable here because:
+
+\begin{enumerate}[leftmargin=*]
+    \item It has low protocol overhead.
+    \item It supports frequent small updates.
+    \item It works directly over the Ethernet connection.
+    \item It is supported by both Windows and Raspberry Pi.
+    \item It allows the application to decide how to handle stale packets.
+\end{enumerate}
+
+The direct Ethernet cable should make packet loss uncommon, but Ethernet does
+not change UDP's delivery guarantees. The application must still implement
+appropriate safety behavior.
+
+\subsection{Reliability for One-Time Commands}
+
+One-time triggers, such as valve commands, need more protection than a
+continuously repeated control state. If a UDP trigger is lost, the next
+control update will not necessarily repeat it.
+
+A robust application-level design is:
+
+\begin{enumerate}[leftmargin=*]
+    \item The laptop sends a trigger with a unique command ID.
+    \item The Raspberry Pi performs the command and sends an acknowledgement.
+    \item The laptop retries if no acknowledgement arrives.
+    \item The Raspberry Pi ignores duplicate command IDs.
+\end{enumerate}
+
+The current backend sends triggers over UDP but does not yet implement this
+acknowledgement and retry protocol.
+
+\section{Comparison with SPI, I2C, and CAN}
+
+UDP is a network transport protocol. SPI, I2C, and CAN are hardware
+communication interfaces or buses. They serve different physical and
+architectural purposes.
+
+\begin{center}
+\begin{tabular}{p{0.18\textwidth} p{0.18\textwidth} p{0.14\textwidth} p{0.18\textwidth} p{0.20\textwidth}}
+\toprule
+Technology & Communication type & Typical range & Wiring & Typical use \\
+\midrule
+UDP over Ethernet & Network protocol & Meters to kilometers & Ethernet cable & Laptop-to-Pi communication \\
+SPI & Local electrical bus & Centimeters & Clock, data, chip-select, ground & High-speed local peripherals \\
+I2C & Local electrical bus & Centimeters & SDA, SCL, ground & Multiple low-speed sensors \\
+CAN & Robust differential bus & Tens to hundreds of meters & CAN-H, CAN-L, ground & Vehicle and distributed controllers \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{SPI}
+
+SPI normally uses clock, data-in, data-out, chip-select, and ground signals.
+It is fast and predictable, but is intended for short board-level
+connections. A typical Windows laptop does not expose general-purpose SPI
+pins. Therefore, SPI is not a practical direct communication method between
+the laptop and Raspberry Pi over an Ethernet cable.
+
+SPI is appropriate for high-speed peripherals directly connected to the
+Raspberry Pi, such as certain sensors, ADCs, displays, or local
+microcontrollers.
+
+\subsection{I2C}
+
+I2C uses two signal wires, SDA and SCL, and supports multiple addressed
+devices on the same local bus. It is useful for devices such as IMUs,
+barometers, temperature sensors, EEPROMs, and battery monitors.
+
+I2C is slower and has shorter practical cable lengths than Ethernet. A laptop
+would need a special USB-to-I2C adapter to communicate with the Pi over I2C.
+It is therefore not a practical replacement for the current laptop-to-Pi
+Ethernet link.
+
+\subsection{CAN}
+
+CAN is a robust, message-oriented bus commonly used in vehicles and robotics.
+It uses differential signaling, message identifiers, arbitration, and
+substantial error detection. CAN is a strong candidate for communication
+inside the drone, particularly between the Raspberry Pi and flight
+controllers, motor controllers, or battery-management systems.
+
+CAN requires CAN interfaces and transceivers. It is more complex to connect
+to a laptop than UDP over Ethernet and generally has lower throughput than
+Ethernet. It is best considered a possible internal drone bus rather than a
+replacement for the laptop-to-Pi network connection.
+
+\section{Recommended Architecture}
+
+A practical architecture is:
+
+\begin{lstlisting}
+Laptop frontend
+    | WebSocket
+    v
+Laptop backend
+    | UDP over Ethernet
+    v
+Raspberry Pi gateway
+    | I2C  -> low-speed sensors
+    | SPI  -> high-speed local peripherals
+    | CAN  -> distributed flight or motor controllers
+\end{lstlisting}
+
+The laptop-to-Pi link should remain Ethernet with UDP because the laptop and
+Pi already support IP networking. SPI and I2C are better used for local
+peripherals attached to the Pi. CAN may be added inside the drone when a
+robust multi-controller bus is required.
+
+\section{Safety Requirements}
+
+No communication protocol by itself makes a drone safe. The Raspberry Pi or
+flight controller should independently enforce:
+
+\begin{itemize}[leftmargin=*]
+    \item a control-packet timeout,
+    \item neutral output or motor shutdown when control packets stop,
+    \item sequence-number and timestamp validation,
+    \item range checks,
+    \item duplicate and stale-command handling,
+    \item acknowledgement or state confirmation for one-time triggers, and
+    \item independent hardware failsafes where possible.
+\end{itemize}
+
+The Raspberry Pi should never assume that a successful call to
+\texttt{sendto()} proves that the packet was received or acted upon.
+
+\section{Summary}
+
+\begin{itemize}[leftmargin=*]
+    \item The frontend runs at \texttt{http://127.0.0.1:6970}.
+    \item The frontend connects to the laptop backend at
+          \texttt{ws://127.0.0.1:5173}.
+    \item The backend sends control and trigger packets to the Pi using UDP
+          port 5000.
+    \item The Pi sends telemetry to the laptop using UDP port 5001.
+    \item A direct Ethernet cable requires compatible IP addresses on both
+          devices, such as laptop \texttt{192.168.1.10} and Pi
+          \texttt{192.168.1.50}.
+    \item UDP is a good fit for frequently changing control and telemetry
+          state, but one-time commands need application-level acknowledgements
+          and retries.
+    \item SPI and I2C are local peripheral buses, while CAN is a robust bus
+          that may be useful inside the drone.
+\end{itemize}
+
+\end{document}
