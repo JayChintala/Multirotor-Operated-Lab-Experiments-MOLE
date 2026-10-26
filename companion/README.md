@@ -149,12 +149,41 @@ python ~/mole/companion/motor_test.py -m 4 -t 10    # only motor 4 (D) at 10 %
 
 In Mission Planner or QGroundControl, add a TCP link:
 
-- Host: `mole.local` (or the Pi's IP address on your network)
+- Host: `mole.local` (or the Pi's IP address on your network; `10.42.0.1` in hotspot mode)
 - Port: `5760`
 
 That is, `tcp:mole.local:5760`. With MAVProxy: `mavproxy.py --master=tcp:mole.local:5760`.
 
 Several clients can be connected at once; mavlink-router passes MAVLink between all of them and the FC.
+
+## Field Wi-Fi: the MOLE hotspot
+
+With no router around, the Pi can broadcast its own Wi-Fi network for the laptop to join. The Pi has one Wi-Fi radio, so it is either on the home network or running the hotspot, never both. You switch by hand with `mole-wifi`, which `setup.sh` installs to `/usr/local/bin`:
+
+```bash
+sudo mole-wifi status     # current mode, address, connected laptops, mode at boot
+sudo mole-wifi hotspot    # before heading out: broadcast MOLE
+sudo mole-wifi home       # back home: rejoin the saved home Wi-Fi
+```
+
+| | |
+|---|---|
+| SSID | `MOLE` |
+| Password | `MOLEMOLE` (WPA2 needs 8+ characters) |
+| Pi address | `10.42.0.1` (or `mole.local`) |
+| Laptop address | handed out by the Pi, `10.42.0.x`; `sudo mole-wifi status` lists it |
+| Band | 2.4 GHz, channel 6 |
+
+- **The mode persists across reboots and battery swaps.** Switch to hotspot before you leave, while you can still reach the Pi at home.
+- **Switching drops SSH over Wi-Fi.** The switch runs as a detached systemd unit (`mole-wifi-switch`) and finishes on its own. Reconnect on the new network: `ssh molepi@10.42.0.1` on MOLE, `ssh molepi@mole.local` at home.
+- **It switches back if the new mode fails.** If the hotspot doesn't start, or no home network is found, within 30 s, it returns to the previous mode. So running `mole-wifi home` in the field leaves the hotspot running.
+- If the Pi is unreachable in both modes, plug in Ethernet or a screen. The log of the last switch: `journalctl -u mole-wifi-switch`.
+- **Internet on the laptop:** the hotspot gives clients no default route or DNS (`/etc/NetworkManager/dnsmasq-shared.d/mole-no-gateway.conf`). The laptop keeps using any other connection for the internet, e.g. iPhone USB tethering, and only talks to the Pi over MOLE.
+- **telemetry_bridge.py** needs the laptop's hotspot address: `--laptop-ip 10.42.0.x` from `mole-wifi status`.
+- The hotspot is the NetworkManager profile `MOLE-hotspot`. Change the password with `sudo nmcli con modify MOLE-hotspot wifi-sec.psk NEWPASS`. It takes effect on the next switch to hotspot.
+- **Range:** the Pi's onboard antenna is small and sits next to the motors and ESC. Range-test on the ground before flying, and stay well within it.
+
+Tested 2026-10-26: switched home → hotspot (`AP-ENABLED`, 10.42.0.1) → home over SSH, with no hands-on access needed.
 
 ## Git
 
