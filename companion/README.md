@@ -48,6 +48,12 @@ TBS Lucid H7 running ArduCopter 4.7.2, with a TBS Lucid 6S 4-in-1 ESC.
 | `SERVO_DSHOT_ESC` | 1 | Lets the FC send DShot commands to the ESC (BLHeli32/AM32 type). Without it, `SERVO_BLH_RVMASK` has no effect |
 | `SERVO_BLH_MASK` | 15 | Outputs 1–4 are DShot ESCs managed by the FC |
 | `SERVO_BLH_RVMASK` | 9 | Reverses outputs 1 and 4 (motors 1 and 4), so the motors spin the Quad X directions: front-right and rear-left CCW, front-left and rear-right CW (seen from above). Verified 2026-10-26 with `motor_test.py` |
+| `BATT_CAPACITY` | 12000 | 12000 mAh 6S pack |
+| `BATT_LOW_VOLT` / `BATT_FS_LOW_ACT` | 21.0 / 1 | 3.5 V per cell: Land |
+| `BATT_CRT_VOLT` / `BATT_FS_CRT_ACT` | 19.8 / 1 | 3.3 V per cell: Land |
+| `BATT_ARM_VOLT` | 22.0 | Won't arm below this. **A 12 V bench supply can no longer arm the FC** |
+| `MOT_BAT_VOLT_MAX` / `MOT_BAT_VOLT_MIN` | 25.2 / 19.8 | Throttle compensation for battery sag (6S) |
+| `ARMING_SKIPCHK` | 4172 | Skips only compass (4), GPS lock (8), RC (64) and GPS config (4096): no GPS/compass module or RC receiver yet. Remove the compass and GPS bits once a GPS/compass module is fitted |
 | `FS_GCS_ENABLE` | 5 | Land if the GCS link is lost. With no RC receiver, the Wi-Fi link to QGC is the only control link |
 | `FS_GCS_TIMEOUT` | 5 | Seconds without a GCS heartbeat before the failsafe triggers |
 | `FS_OPTIONS` | 0 | GCS failsafe applies in every mode. The earlier value, 18, kept flying in Stabilize/AltHold/Loiter and in Auto missions after link loss |
@@ -57,7 +63,7 @@ Reboot the FC after changing `SERIAL7_*` or `MOT_PWM_TYPE`. With DShot working, 
 Bench notes:
 - The motors spin on a 12 V bench supply (10 A limit). Expect lower top speed than on 6S.
 - No RC receiver is connected yet, so the FC reports 0 RC channels.
-- `BATT_LOW_VOLT` is 10.5 V (a 3S value) and the FC reports the battery monitor as unhealthy. Set the battery parameters for 6S before flying.
+- Battery failsafes are set for 6S (2026-10-26). Check the voltage reading against a multimeter with the LiPo connected, and adjust `BATT_VOLT_MULT` (11) if it's off.
 
 ## Changes made to this Pi
 
