@@ -53,7 +53,7 @@ TBS Lucid H7 running ArduCopter 4.7.2, with a TBS Lucid 6S 4-in-1 ESC.
 | `BATT_CRT_VOLT` / `BATT_FS_CRT_ACT` | 19.8 / 1 | 3.3 V per cell: Land |
 | `BATT_ARM_VOLT` | 22.0 | Won't arm below this. **A 12 V bench supply can no longer arm the FC** |
 | `MOT_BAT_VOLT_MAX` / `MOT_BAT_VOLT_MIN` | 25.2 / 19.8 | Throttle compensation for battery sag (6S) |
-| `ARMING_SKIPCHK` | 4172 | Skips only compass (4), GPS lock (8), RC (64) and GPS config (4096): no GPS/compass module or RC receiver yet. Remove the compass and GPS bits once a GPS/compass module is fitted |
+| `ARMING_SKIPCHK` | 5196 | Skips only compass (4), GPS lock (8), RC (64), logging (1024) and GPS config (4096): no GPS/compass module, RC receiver or FC SD card yet. Remove the compass and GPS bits once a GPS/compass module is fitted |
 | `FS_GCS_ENABLE` | 5 | Land if the GCS link is lost. With no RC receiver, the Wi-Fi link to QGC is the only control link |
 | `FS_GCS_TIMEOUT` | 5 | Seconds without a GCS heartbeat before the failsafe triggers |
 | `FS_OPTIONS` | 0 | GCS failsafe applies in every mode. The earlier value, 18, kept flying in Stabilize/AltHold/Loiter and in Auto missions after link loss |
