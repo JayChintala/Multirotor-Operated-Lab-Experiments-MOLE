@@ -35,16 +35,22 @@ Tested 2026-10-04: two-way MAVLink between the Pi and the FC is working, and the
 
 ## Flight controller settings
 
-TBS Lucid H7 running ArduCopter 4.7.1, with a TBS Lucid 6S 4-in-1 ESC.
+TBS Lucid H7 running ArduCopter 4.7.2, with a TBS Lucid 6S 4-in-1 ESC.
 
 | Parameter | Value | Why |
 |---|---|---|
 | `SERIAL7_PROTOCOL` | 2 | MAVLink2 on the UART wired to the Pi |
 | `SERIAL7_BAUD` | 921 | 921600 baud, matching mavlink-router |
-| `MOT_PWM_TYPE` | 6 | DShot600. **Required for the Lucid 4-in-1 ESC**: with the default 0 (PWM) the FC accepts motor tests but the motors don't spin |
+| `MOT_PWM_TYPE` | 5 | DShot300 (was 6, DShot600, when first set up). **DShot is required for the Lucid 4-in-1 ESC**: with the default 0 (PWM) the FC accepts motor tests but the motors don't spin |
 | `FRAME_CLASS` / `FRAME_TYPE` | 1 / 1 | Quad X |
 | `SERVO1_FUNCTION`–`SERVO4_FUNCTION` | 33–36 | Outputs 1–4 drive motors 1–4 |
 | `BRD_SAFETY_DEFLT` | 0 | No safety switch |
+| `SERVO_DSHOT_ESC` | 1 | Lets the FC send DShot commands to the ESC (BLHeli32/AM32 type). Without it, `SERVO_BLH_RVMASK` has no effect |
+| `SERVO_BLH_MASK` | 15 | Outputs 1–4 are DShot ESCs managed by the FC |
+| `SERVO_BLH_RVMASK` | 9 | Reverses outputs 1 and 4 (motors 1 and 4), so the motors spin the Quad X directions: front-right and rear-left CCW, front-left and rear-right CW (seen from above). Verified 2026-10-26 with `motor_test.py` |
+| `FS_GCS_ENABLE` | 5 | Land if the GCS link is lost. With no RC receiver, the Wi-Fi link to QGC is the only control link |
+| `FS_GCS_TIMEOUT` | 5 | Seconds without a GCS heartbeat before the failsafe triggers |
+| `FS_OPTIONS` | 0 | GCS failsafe applies in every mode. The earlier value, 18, kept flying in Stabilize/AltHold/Loiter and in Auto missions after link loss |
 
 Reboot the FC after changing `SERIAL7_*` or `MOT_PWM_TYPE`. With DShot working, the ESC plays its start-up tones followed by confirmation beeps once the FC has booted.
 
@@ -149,12 +155,41 @@ python ~/mole/companion/motor_test.py -m 4 -t 10    # only motor 4 (D) at 10 %
 
 In Mission Planner or QGroundControl, add a TCP link:
 
-- Host: `mole.local` (or the Pi's IP address on your network)
+- Host: `mole.local` (or the Pi's IP address on your network; `10.42.0.1` in hotspot mode)
 - Port: `5760`
 
 That is, `tcp:mole.local:5760`. With MAVProxy: `mavproxy.py --master=tcp:mole.local:5760`.
 
 Several clients can be connected at once; mavlink-router passes MAVLink between all of them and the FC.
+
+## Field Wi-Fi: the MOLE hotspot
+
+With no router around, the Pi can broadcast its own Wi-Fi network for the laptop to join. The Pi has one Wi-Fi radio, so it is either on the home network or running the hotspot, never both. You switch by hand with `mole-wifi`, which `setup.sh` installs to `/usr/local/bin`:
+
+```bash
+sudo mole-wifi status     # current mode, address, connected laptops, mode at boot
+sudo mole-wifi hotspot    # before heading out: broadcast MOLE
+sudo mole-wifi home       # back home: rejoin the saved home Wi-Fi
+```
+
+| | |
+|---|---|
+| SSID | `MOLE` |
+| Password | `MOLEMOLE` (WPA2 needs 8+ characters) |
+| Pi address | `10.42.0.1` (or `mole.local`) |
+| Laptop address | handed out by the Pi, `10.42.0.x`; `sudo mole-wifi status` lists it |
+| Band | 2.4 GHz, channel 6 |
+
+- **The mode persists across reboots and battery swaps.** Switch to hotspot before you leave, while you can still reach the Pi at home.
+- **Switching drops SSH over Wi-Fi.** The switch runs as a detached systemd unit (`mole-wifi-switch`) and finishes on its own. Reconnect on the new network: `ssh molepi@10.42.0.1` on MOLE, `ssh molepi@mole.local` at home.
+- **It switches back if the new mode fails.** If the hotspot doesn't start, or no home network is found, within 30 s, it returns to the previous mode. So running `mole-wifi home` in the field leaves the hotspot running.
+- If the Pi is unreachable in both modes, plug in Ethernet or a screen. The log of the last switch: `journalctl -u mole-wifi-switch`.
+- **Internet on the laptop:** the hotspot gives clients no default route or DNS (`/etc/NetworkManager/dnsmasq-shared.d/mole-no-gateway.conf`). The laptop keeps using any other connection for the internet, e.g. iPhone USB tethering, and only talks to the Pi over MOLE.
+- **telemetry_bridge.py** needs the laptop's hotspot address: `--laptop-ip 10.42.0.x` from `mole-wifi status`.
+- The hotspot is the NetworkManager profile `MOLE-hotspot`. Change the password with `sudo nmcli con modify MOLE-hotspot wifi-sec.psk NEWPASS`. It takes effect on the next switch to hotspot.
+- **Range:** the Pi's onboard antenna is small and sits next to the motors and ESC. Range-test on the ground before flying, and stay well within it.
+
+Tested 2026-10-26: switched home → hotspot (`AP-ENABLED`, 10.42.0.1) → home over SSH, with no hands-on access needed.
 
 ## Git
 

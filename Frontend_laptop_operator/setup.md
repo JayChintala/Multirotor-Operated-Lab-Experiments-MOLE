@@ -18,7 +18,7 @@ Install the following on the computer that will run the laptop software:
 - Node.js 20.19+ or 22.12+.
 - npm.
 - Python 3.10 or newer.
-- A Raspberry Pi reachable over Ethernet or another IP network.
+- A Raspberry Pi reachable over Ethernet, its `MOLE` Wi-Fi hotspot, or another IP network.
 
 The Python backend requires the packages listed in
 `laptop_backend/requirements.txt`. The synthetic video producer additionally
@@ -70,6 +70,30 @@ python -m pip install -r control_center/requirements.txt
 ```
 
 ## Network configuration
+
+### In the field: the Pi's MOLE hotspot
+
+With no router available, the Pi can broadcast its own Wi-Fi network. On the
+Pi, run `sudo mole-wifi hotspot` while still on the home network (see
+`companion/README.md`), then join it from the laptop:
+
+| | |
+|---|---|
+| Wi-Fi network | `MOLE` |
+| Password | `MOLEMOLE` |
+| Raspberry Pi | `10.42.0.1` |
+| Laptop | `10.42.0.x`, assigned by the Pi; `sudo mole-wifi status` on the Pi lists it |
+
+Use `--pi-ip 10.42.0.1` in the backend commands below, and run the Pi's
+`telemetry_bridge.py` with `--laptop-ip` set to the laptop's `10.42.0.x`
+address. QGroundControl connects over TCP to `10.42.0.1:5760`.
+
+The hotspot provides no internet. For internet at the same time, connect a
+phone by USB cable with its hotspot turned on (on an iPhone: Settings →
+Personal Hotspot → Allow Others to Join). The laptop's Wi-Fi is in use by
+`MOLE`, so a phone hotspot over Wi-Fi won't work.
+
+### Direct Ethernet
 
 For a direct Ethernet connection, assign both devices addresses on the same
 subnet. One example is:

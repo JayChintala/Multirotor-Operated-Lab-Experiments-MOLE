@@ -86,6 +86,10 @@ else
   sudo systemctl start mavlink-router   # no-op if already running
 fi
 
+log "mole-wifi command (home Wi-Fi <-> MOLE hotspot; does not switch anything)"
+chmod +x "$REPO_DIR/mole-wifi"
+sudo ln -sfn "$REPO_DIR/mole-wifi" /usr/local/bin/mole-wifi
+
 log "Checks"
 chmod +x "$REPO_DIR/check_link.py"
 sleep 2

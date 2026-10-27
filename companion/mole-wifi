@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# Switch the Pi's Wi-Fi between the home network and its own "MOLE" hotspot.
+#
+#   sudo mole-wifi status     # which mode is active, and the Pi's address
+#   sudo mole-wifi hotspot    # broadcast MOLE (field use); Pi is 10.42.0.1
+#   sudo mole-wifi home       # rejoin the saved home Wi-Fi
+#
+# The choice persists across reboots. The Pi has one radio, so switching drops
+# any SSH session on wlan0: the switch runs as a detached systemd unit and
+# finishes on its own. If the new mode fails to come up within 30 s it switches
+# back, so a bad switch never leaves the Pi unreachable.
+# Log of the last switch: journalctl -u mole-wifi-switch
+set -euo pipefail
+
+HOTSPOT=MOLE-hotspot
+SSID=MOLE
+PSK="${MOLE_WIFI_PSK:-MOLEMOLE}"   # only used when the profile is first created
+ADDR=10.42.0.1/24
+IFACE=wlan0
+WAIT=30
+# NetworkManager's dnsmasq for shared connections reads this directory
+DNSMASQ_CONF=/etc/NetworkManager/dnsmasq-shared.d/mole-no-gateway.conf
+
+usage() { sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+
+if [ "$(id -u)" -ne 0 ]; then
+  exec sudo "$0" "$@"
+fi
+
+home_profiles() {
+  # Saved Wi-Fi client profiles, highest autoconnect priority first
+  nmcli -t -f NAME,TYPE con show | awk -F: '$2 == "802-11-wireless" {print $1}' |
+    while read -r name; do
+      [ "$name" = "$HOTSPOT" ] && continue
+      [ "$(nmcli -g 802-11-wireless.mode con show "$name")" = ap ] && continue
+      echo "$(nmcli -g connection.autoconnect-priority con show "$name") $name"
+    done | sort -rn | cut -d' ' -f2-
+}
+
+ensure_hotspot() {
+  # No default route or DNS for clients, so a laptop on MOLE keeps using its
+  # other connection (e.g. iPhone USB tethering) for the internet
+  if [ ! -f "$DNSMASQ_CONF" ]; then
+    install -d "$(dirname "$DNSMASQ_CONF")"
+    printf 'dhcp-option=option:router\ndhcp-option=option:dns-server\n' > "$DNSMASQ_CONF"
+  fi
+  nmcli -t -f NAME con show | grep -qxF "$HOTSPOT" && return
+  nmcli con add type wifi ifname "$IFACE" con-name "$HOTSPOT" autoconnect no ssid "$SSID" \
+    802-11-wireless.mode ap 802-11-wireless.band bg 802-11-wireless.channel 6 \
+    802-11-wireless.powersave 2 \
+    wifi-sec.key-mgmt wpa-psk wifi-sec.proto rsn wifi-sec.pairwise ccmp wifi-sec.group ccmp \
+    wifi-sec.psk "$PSK" \
+    ipv4.method shared ipv4.addresses "$ADDR" ipv6.method disabled >/dev/null
+  echo "Created hotspot profile $HOTSPOT (SSID $SSID)"
+}
+
+active() { nmcli -t -f NAME,DEVICE con show --active | awk -F: -v d="$IFACE" '$2 == d {print $1}'; }
+
+to_hotspot() {
+  # Priority 100 beats the home profiles at boot; AP mode needs no scan
+  nmcli con modify "$HOTSPOT" connection.autoconnect yes connection.autoconnect-priority 100
+  nmcli --wait "$WAIT" con up "$HOTSPOT" >/dev/null 2>&1 && [ "$(active)" = "$HOTSPOT" ]
+}
+
+to_home() {
+  nmcli con modify "$HOTSPOT" connection.autoconnect no
+  nmcli con down "$HOTSPOT" >/dev/null 2>&1 || true
+  nmcli dev wifi rescan ifname "$IFACE" >/dev/null 2>&1 || true
+  sleep 5
+  local name
+  while read -r name; do
+    [ -n "$name" ] || continue
+    echo "Trying $name"
+    if nmcli --wait "$WAIT" con up "$name" >/dev/null 2>&1; then
+      return 0
+    fi
+  done < <(home_profiles)
+  return 1
+}
+
+switch() {
+  case "$1" in
+    hotspot)
+      if to_hotspot; then echo "Hotspot $SSID is up at ${ADDR%/*}"; return; fi
+      echo "Hotspot failed to start; going back to home Wi-Fi"
+      to_home || echo "Home Wi-Fi failed too: connect Ethernet or a screen"
+      exit 1 ;;
+    home)
+      if to_home; then echo "Connected to $(active)"; return; fi
+      echo "No home network found; going back to hotspot $SSID"
+      to_hotspot || echo "Hotspot failed too: connect Ethernet or a screen"
+      exit 1 ;;
+  esac
+}
+
+status() {
+  local cur
+  cur="$(active)"
+  if [ "$cur" = "$HOTSPOT" ]; then
+    echo "Mode: hotspot (SSID $SSID)"
+    echo "Clients:"
+    ip neigh show dev "$IFACE" | awk '$NF != "FAILED" {print "  " $1, $5}'
+  elif [ -n "$cur" ]; then
+    echo "Mode: home ($cur)"
+  else
+    echo "Mode: none (wlan0 not connected)"
+  fi
+  echo "Address: $(ip -4 -o addr show dev "$IFACE" | awk '{print $4}')"
+  echo "At boot: $([ "$(nmcli -g connection.autoconnect con show "$HOTSPOT" 2>/dev/null)" = yes ] && echo hotspot || echo home)"
+}
+
+case "${1:-}" in
+  status) status ;;
+  hotspot|home)
+    ensure_hotspot
+    if [ "${2:-}" = --now ]; then
+      switch "$1"
+    else
+      systemctl reset-failed mole-wifi-switch >/dev/null 2>&1 || true
+      systemd-run --quiet --collect --unit mole-wifi-switch "$(readlink -f "$0")" "$1" --now
+      if [ "$1" = hotspot ]; then
+        echo "Switching to hotspot. Join Wi-Fi \"$SSID\", then: ssh molepi@${ADDR%/*}"
+      else
+        echo "Switching to home Wi-Fi. Then: ssh molepi@mole.local"
+      fi
+      echo "SSH over Wi-Fi will drop now. Log: journalctl -u mole-wifi-switch"
+    fi ;;
+  *) usage ;;
+esac
