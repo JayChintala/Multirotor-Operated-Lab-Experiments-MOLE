@@ -41,10 +41,13 @@ TBS Lucid H7 running ArduCopter 4.7.2, with a TBS Lucid 6S 4-in-1 ESC.
 |---|---|---|
 | `SERIAL7_PROTOCOL` | 2 | MAVLink2 on the UART wired to the Pi |
 | `SERIAL7_BAUD` | 921 | 921600 baud, matching mavlink-router |
-| `MOT_PWM_TYPE` | 6 | DShot600. **Required for the Lucid 4-in-1 ESC**: with the default 0 (PWM) the FC accepts motor tests but the motors don't spin |
+| `MOT_PWM_TYPE` | 5 | DShot300 (was 6, DShot600, when first set up). **DShot is required for the Lucid 4-in-1 ESC**: with the default 0 (PWM) the FC accepts motor tests but the motors don't spin |
 | `FRAME_CLASS` / `FRAME_TYPE` | 1 / 1 | Quad X |
 | `SERVO1_FUNCTION`–`SERVO4_FUNCTION` | 33–36 | Outputs 1–4 drive motors 1–4 |
 | `BRD_SAFETY_DEFLT` | 0 | No safety switch |
+| `SERVO_DSHOT_ESC` | 1 | Lets the FC send DShot commands to the ESC (BLHeli32/AM32 type). Without it, `SERVO_BLH_RVMASK` has no effect |
+| `SERVO_BLH_MASK` | 15 | Outputs 1–4 are DShot ESCs managed by the FC |
+| `SERVO_BLH_RVMASK` | 9 | Reverses outputs 1 and 4 (motors 1 and 4), so the motors spin the Quad X directions: front-right and rear-left CCW, front-left and rear-right CW (seen from above). Verified 2026-10-26 with `motor_test.py` |
 | `FS_GCS_ENABLE` | 5 | Land if the GCS link is lost. With no RC receiver, the Wi-Fi link to QGC is the only control link |
 | `FS_GCS_TIMEOUT` | 5 | Seconds without a GCS heartbeat before the failsafe triggers |
 | `FS_OPTIONS` | 0 | GCS failsafe applies in every mode. The earlier value, 18, kept flying in Stabilize/AltHold/Loiter and in Auto missions after link loss |
