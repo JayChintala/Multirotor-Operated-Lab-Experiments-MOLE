@@ -94,6 +94,7 @@ Bench notes:
 - Config file: `/etc/mavlink-router/main.conf`
   - UART endpoint `fc`: `/dev/serial0` at 921600
   - TCP server on port 5760, all interfaces
+  - Flight logs to `~/logs` while armed, keeping 2 GB free (see Flight logs)
 - The service is enabled, so it starts at boot. It runs and listens on 5760 even with no FC attached.
 
 ### Scripts
@@ -121,6 +122,18 @@ To rebuild after an update:
 cd ~/src/mavlink-router && git pull && git submodule update --init --recursive
 ninja -C build -j2 && sudo ninja -C build install && sudo systemctl restart mavlink-router
 ```
+
+## Flight logs
+
+The FC has no SD card. It streams its dataflash log to the Pi over MAVLink (`LOG_BACKEND_TYPE` = 2), and mavlink-router saves it to `~/logs`. That gives one `.bin` per arming, named like `00000-2026-10-26_21-18-06.bin`. These are the same logs an SD card would hold: open them in Mission Planner, MAVExplorer or UAV Log Viewer.
+
+- Logs are recorded only while armed (`LogMode = while-armed` here, `LOG_DISARMED` = 0 on the FC).
+- When the SD card drops below 2 GB free, the oldest logs are deleted.
+- The files belong to root (mavlink-router runs as root) but are readable. Deleting them needs `sudo rm`.
+- To copy them to the Mac: `scp 'pi:logs/*.bin' ~/Desktop/`.
+- If the Pi or its link to the FC fails mid-flight, the log stops there.
+
+Tested 2026-10-26: with logging forced on while disarmed, a 30 s log came to 562 KB (about 1 MB per minute) and parsed with IMU, EKF and all parameters.
 
 ## Checking the link
 
