@@ -70,6 +70,7 @@ sudo ninja -C "$ROUTER_SRC/build" install
 
 log "mavlink-router config + service"
 sudo install -d /etc/mavlink-router
+install -d "$HOME/logs"   # flight logs (Log in main.conf)
 CONF_CHANGED=0
 if ! sudo cmp -s "$REPO_DIR/mavlink-router/main.conf" /etc/mavlink-router/main.conf; then
   if [ -f /etc/mavlink-router/main.conf ]; then
