@@ -4,6 +4,12 @@ The browser connects to port 5173. Control and trigger messages are forwarded
 as JSON over UDP to the Pi. Telemetry is received from UDP port 5001 and
 broadcast back to browser clients. Video frames are received from a camera
 producer over WebSocket and relayed to the browser clients.
+
+Kill switch: while at least one browser is connected, KILL_HEARTBEAT packets go
+to the Pi's kill_switch.py (UDP 5002) at 10 Hz, and KILL from the browser is
+forwarded there. The Pi force-disarms the FC on KILL, or when the heartbeat
+stops while armed, so closing the control center or losing the laptop link
+stops the props.
 """
 
 import argparse
@@ -23,6 +29,8 @@ from websockets.asyncio.server import ServerConnection, serve
 
 
 MAX_WEBSOCKET_MESSAGE_SIZE = 2 * 1024 * 1024
+KILL_HEARTBEAT_PERIOD = 0.1  # s; the Pi disarms after 1 s without one
+KILL_REPEATS = 5             # UDP can drop packets, so each KILL is sent this many times
 
 
 class Bridge:
@@ -30,6 +38,7 @@ class Bridge:
         self,
         pi_ip: str,
         pi_control_port: int,
+        pi_kill_port: int,
         telemetry_port: int,
         host: str,
         websocket_port: int,
@@ -37,6 +46,7 @@ class Bridge:
     ) -> None:
         self.pi_ip = pi_ip
         self.pi_control_port = pi_control_port
+        self.pi_kill_port = pi_kill_port
         self.telemetry_port = telemetry_port
         self.host = host
         self.websocket_port = websocket_port
@@ -46,6 +56,12 @@ class Bridge:
         self.telemetry_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.telemetry_socket.bind(("0.0.0.0", telemetry_port))
         self.telemetry_socket.settimeout(0.2)
+        # Own socket so the Pi's KILL_STATUS replies come back to it
+        self.kill_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.kill_socket.bind(("0.0.0.0", 0))
+        self.kill_socket.settimeout(0.2)
+        self.last_kill_status: Optional[dict] = None
+        self.last_kill_status_monotonic = 0.0
         self.state_lock = threading.Lock()
         self.clients: Set[ServerConnection] = set()
         self.ws_loop: Optional[asyncio.AbstractEventLoop] = None
@@ -88,6 +104,7 @@ class Bridge:
         with self.state_lock:
             telemetry_age = int((now - self.last_telemetry_monotonic) * 1000) if self.last_telemetry_monotonic else None
             control_age = int((now - self.last_control_monotonic) * 1000) if self.last_control_monotonic else None
+            kill_age = int((now - self.last_kill_status_monotonic) * 1000) if self.last_kill_status_monotonic else None
             return {
                 "version": 1,
                 "type": "BRIDGE_STATUS",
@@ -99,6 +116,7 @@ class Bridge:
                 "last_control_seq": self.last_control_seq,
                 "video_url": self.video_url,
                 "video_connected": self.video_connected,
+                "kill_switch": {**(self.last_kill_status or {}), "age_ms": kill_age},
             }
 
     async def broadcast(self, message: dict) -> None:
@@ -243,6 +261,9 @@ class Bridge:
                         "name": name,
                         "time_ms": int(time.time() * 1000),
                     })
+                elif message_type == "KILL":
+                    print("KILL from the control center")
+                    await self.send_kill()
                 elif message_type == "CONFIG":
                     await websocket.send(json.dumps(self.status()))
                 else:
@@ -274,6 +295,56 @@ class Bridge:
                     print(f"Telemetry socket error from {address}: {error}")
                 return
 
+    def send_kill_packet(self, message: dict) -> None:
+        payload = json.dumps(message, separators=(",", ":")).encode("utf-8")
+        try:
+            self.kill_socket.sendto(payload, (self.pi_ip, self.pi_kill_port))
+        except OSError as error:
+            # e.g. no route while the Wi-Fi is down; the Pi times out and disarms
+            print(f"Kill switch send failed: {error}")
+
+    async def send_kill(self) -> None:
+        message = {"version": 1, "type": "KILL", "id": int(time.time() * 1000), "time_ms": int(time.time() * 1000)}
+        self.log_json("tx", "udp", message)
+        for _ in range(KILL_REPEATS):
+            self.send_kill_packet(message)
+            await asyncio.sleep(0.02)
+
+    async def kill_heartbeat_loop(self) -> None:
+        # Only while a browser is open: no control center means no KILL button,
+        # so the Pi should stop the props.
+        while True:
+            if self.clients:
+                self.send_kill_packet({"version": 1, "type": "KILL_HEARTBEAT", "time_ms": int(time.time() * 1000)})
+            await asyncio.sleep(KILL_HEARTBEAT_PERIOD)
+
+    def kill_status_loop(self) -> None:
+        while not self.stopping.is_set():
+            try:
+                data, _ = self.kill_socket.recvfrom(65535)
+                message = json.loads(data.decode("utf-8"))
+            except socket.timeout:
+                continue
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                continue
+            except OSError:
+                if self.stopping.is_set():
+                    return
+                time.sleep(0.2)  # ICMP port unreachable while kill_switch.py is down
+                continue
+            if not isinstance(message, dict) or message.get("type") != "KILL_STATUS":
+                continue
+            with self.state_lock:
+                previous = self.last_kill_status
+                self.last_kill_status = message
+                self.last_kill_status_monotonic = time.monotonic()
+            changed = previous is None or any(
+                previous.get(key) != message.get(key) for key in ("armed", "fc_linked", "killing"))
+            if changed:
+                self.log_json("rx", "udp", message)
+                if self.ws_loop is not None:
+                    asyncio.run_coroutine_threadsafe(self.broadcast(self.status()), self.ws_loop)
+
     async def status_loop(self) -> None:
         while True:
             await asyncio.sleep(1.0)
@@ -283,16 +354,20 @@ class Bridge:
         self.ws_loop = asyncio.get_running_loop()
         telemetry_thread = threading.Thread(target=self.telemetry_loop, daemon=True)
         telemetry_thread.start()
+        kill_status_thread = threading.Thread(target=self.kill_status_loop, daemon=True)
+        kill_status_thread.start()
         async with serve(self.browser_handler, self.host, self.websocket_port, max_size=MAX_WEBSOCKET_MESSAGE_SIZE, ping_interval=20, ping_timeout=20):
             print(f"WebSocket: ws://{self.host}:{self.websocket_port}")
             print(f"Pi UDP target: {self.pi_ip}:{self.pi_control_port}")
+            print(f"Pi kill switch: {self.pi_ip}:{self.pi_kill_port}")
             print(f"Telemetry UDP listen: 0.0.0.0:{self.telemetry_port}")
-            await asyncio.gather(self.status_loop(), self.video_loop())
+            await asyncio.gather(self.status_loop(), self.video_loop(), self.kill_heartbeat_loop())
 
     def close(self) -> None:
         self.stopping.set()
         self.control_socket.close()
         self.telemetry_socket.close()
+        self.kill_socket.close()
         with self.log_lock:
             self.log_file.close()
 
@@ -301,6 +376,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pi-ip", default="192.168.1.50")
     parser.add_argument("--pi-control-port", type=int, default=5000)
+    parser.add_argument("--pi-kill-port", type=int, default=5002)
     parser.add_argument("--telemetry-port", type=int, default=5001)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5173)
@@ -313,6 +389,7 @@ def main() -> None:
     bridge = Bridge(
         args.pi_ip,
         args.pi_control_port,
+        args.pi_kill_port,
         args.telemetry_port,
         args.host,
         args.port,

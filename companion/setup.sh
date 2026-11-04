@@ -86,6 +86,18 @@ else
   sudo systemctl start mavlink-router   # no-op if already running
 fi
 
+log "Kill switch service (force-disarm on laptop KILL or laptop link loss)"
+chmod +x "$REPO_DIR/kill_switch.py"
+if ! sudo cmp -s "$REPO_DIR/kill-switch.service" /etc/systemd/system/kill-switch.service; then
+  sudo install -m 644 "$REPO_DIR/kill-switch.service" /etc/systemd/system/kill-switch.service
+  sudo systemctl daemon-reload
+  sudo systemctl enable kill-switch
+  sudo systemctl restart kill-switch
+else
+  sudo systemctl enable kill-switch
+  sudo systemctl start kill-switch   # no-op if already running
+fi
+
 log "mole-wifi command (home Wi-Fi <-> MOLE hotspot; does not switch anything)"
 chmod +x "$REPO_DIR/mole-wifi"
 sudo ln -sfn "$REPO_DIR/mole-wifi" /usr/local/bin/mole-wifi
@@ -97,6 +109,11 @@ if ss -ltn | grep -q ':5760 '; then
   echo "OK   mavlink-router is listening on TCP 5760"
 else
   echo "FAIL mavlink-router is not listening on 5760: journalctl -u mavlink-router -n 50"
+fi
+if systemctl is-active --quiet kill-switch; then
+  echo "OK   kill-switch is running"
+else
+  echo "FAIL kill-switch is not running: journalctl -u kill-switch -n 50"
 fi
 
 if [ "$REBOOT_NEEDED" = 1 ]; then

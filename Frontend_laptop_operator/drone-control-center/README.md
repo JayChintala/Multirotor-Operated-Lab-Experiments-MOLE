@@ -123,6 +123,16 @@ The frontend maps `W/A/S/D` to pitch/roll and the Up/Down arrows to
 throttle. Hold a key to send the command; releasing it returns that axis to
 neutral.
 
+## Kill switch
+
+The red **KILL MOTORS** bar (or Space) force-disarms the drone through the
+Pi's `companion/kill_switch.py`. The props stop and the drone drops. While a
+page is open, the backend also sends a 10 Hz heartbeat to the Pi on UDP 5002
+(`--pi-kill-port`). If it stops for 1 s while armed, the Pi disarms the drone,
+so closing the page, stopping the backend or losing Wi-Fi stops the props. The
+bar's title shows `WATCHDOG LIVE` when the Pi is answering. See
+`companion/README.md` for details.
+
 ## Run the synthetic video producer (standalone test only)
 
 The repository includes `control_center/gaussian_video_server.py`. It generates

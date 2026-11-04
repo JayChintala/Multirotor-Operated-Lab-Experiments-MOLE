@@ -53,6 +53,15 @@ type ControlCommand = {
   throttle: number;
 };
 
+// KILL_STATUS from the Pi's kill_switch.py, relayed in BRIDGE_STATUS
+type KillSwitchStatus = {
+  armed?: boolean;
+  fc_linked?: boolean;
+  killing?: string | null;
+  timeout_s?: number;
+  age_ms?: number | null;
+};
+
 type LogEntry = {
   time: string;
   message: string;
@@ -85,6 +94,7 @@ function App() {
   const [gamepadName, setGamepadName] = useState<string | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [trajectory, setTrajectory] = useState<TrajectoryPoint[]>([]);
+  const [killStatus, setKillStatus] = useState<KillSwitchStatus | null>(null);
   const gpsOriginRef = useRef<{ lat: number; lon: number } | null>(null);
 
   useEffect(() => {
@@ -134,6 +144,8 @@ function App() {
           } else if (message.type === "TELEMETRY") {
             setTelemetry(message);
             setLastTelemetryTime(Date.now());
+          } else if (message.type === "BRIDGE_STATUS") {
+            setKillStatus(message.kill_switch ?? null);
           } else if (message.type === "ERROR") {
             addLog(`Backend error: ${message.message}`);
           }
@@ -145,6 +157,7 @@ function App() {
       currentSocket.onclose = () => {
         setConnected(false);
         setSocket(null);
+        setKillStatus(null);
         if (active) reconnectTimer = window.setTimeout(connect, 1000);
       };
     };
@@ -303,6 +316,33 @@ function App() {
     gpsOriginRef.current = null;
   };
 
+  const sendKill = () => {
+    if (socket?.readyState !== WebSocket.OPEN) {
+      addLog("KILL not sent: backend disconnected (the Pi stops the props by itself after its timeout)");
+      return;
+    }
+    socket.send(JSON.stringify({ version: 1, type: "KILL", time_ms: Date.now() }));
+    addLog("KILL sent");
+  };
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Space" || event.repeat) return;
+      event.preventDefault();
+      sendKill();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [socket]);
+
+  const killLinked = connected
+    && killStatus?.age_ms !== undefined && killStatus.age_ms !== null && killStatus.age_ms < STALE_AFTER_MS;
+  const killState = !connected ? "BACKEND DISCONNECTED"
+    : !killLinked ? "NO LINK TO PI KILL SWITCH"
+    : killStatus?.killing ? `STOPPING PROPS: ${killStatus.killing.toUpperCase()}`
+    : !killStatus?.fc_linked ? "PI LINKED · NO FC HEARTBEAT"
+    : `WATCHDOG LIVE · FC ${killStatus.armed ? "ARMED" : "DISARMED"} · STOPS ${killStatus.timeout_s ?? 1} S AFTER LINK LOSS`;
+
   const sendTrigger = (name: string) => {
     if (socket?.readyState !== WebSocket.OPEN) {
       addLog(`Trigger ${name} not sent: backend disconnected`);
@@ -402,6 +442,13 @@ function App() {
           <button onClick={() => sendTrigger("valve_2_on")}>VALVE 2 ON</button>
           <button onClick={() => sendTrigger("valve_1_off")}>VALVE 1 OFF</button>
           <button onClick={() => sendTrigger("valve_2_off")}>VALVE 2 OFF</button>
+        </div>
+      </section>
+
+      <section className="panel kill-panel">
+        <PanelTitle title="KILL SWITCH" status={killState} live={killLinked && !!killStatus?.fc_linked && !killStatus?.killing} />
+        <div className="kill-content">
+          <button className="kill-button" onClick={sendKill}>KILL MOTORS · SPACE</button>
         </div>
       </section>
     </main>

@@ -6,6 +6,7 @@ computer for an ArduPilot flight controller (TBS Lucid H7).
 ```
 FC (SERIAL7, 921600) ──UART──> /dev/serial0 ──> mavlink-router ──> TCP :5760
                                                                     ├─ check_link.py / motor_test.py
+                                                                    ├─ kill_switch.py <── UDP 5002 ── laptop control center
                                                                     └─ laptop GCS
 ```
 
@@ -94,6 +95,7 @@ Bench notes:
 - `~/mole/companion/setup.sh`: reproduces this whole setup on a fresh Pi (see Quick setup).
 - `~/mole/companion/check_link.py`: a read-only link check (see below).
 - `~/mole/companion/motor_test.py`: bench motor test, one motor at a time (see below).
+- `~/mole/companion/kill_switch.py`: kill switch watchdog, run by `kill-switch.service` (see Kill switch).
 - `~/mole/companion/README.md`: this file.
 - `~/mole/companion/mavlink-router/main.conf`: copy of `/etc/mavlink-router/main.conf` for reference. After editing, install it with `sudo install -m 644 companion/mavlink-router/main.conf /etc/mavlink-router/` and restart the service.
 
@@ -150,6 +152,27 @@ python ~/mole/companion/motor_test.py -m 4 -t 10    # only motor 4 (D) at 10 %
 - Before any motor command, it checks the FC answers a harmless request. If not, it stops without sending one.
 - If the FC refuses, the script prints the reason (e.g. RC not calibrated, vehicle not landed).
 - If the FC accepts but nothing spins, check `MOT_PWM_TYPE` (see Flight controller settings), that the ESC is powered, and try `-t 10` or higher.
+
+## Kill switch
+
+`kill_switch.py` runs as the `kill-switch` service (installed and enabled by `setup.sh`). It **force-disarms the FC, which stops the props even in flight, so the drone drops**. Only fly where that is safe, such as the padded cage. It disarms when:
+
+- **KILL** is pressed in the control center (the red bar, or Space), or
+- **the laptop link drops** while the FC is armed: no heartbeat from the control center backend for 1 s (`--timeout`). The backend sends the heartbeat only while a control center page is open. Closing the page, stopping the backend, the laptop sleeping or the Wi-Fi dropping all stop the props.
+
+It also disarms an FC that is **armed with no control center connected**, so start the backend and open the page before arming.
+
+- The disarm is `MAV_CMD_COMPONENT_ARM_DISARM` with param2 = 21196 (forced), repeated every 0.1 s until the FC reports disarmed. Tested 2026-11-03: the FC accepts it.
+- It runs on the Pi and talks to the FC through mavlink-router over the UART, so it works with the Wi-Fi down. If the Pi itself fails, the FC's own GCS failsafe (`FS_GCS_ENABLE` = 5) lands after 5 s.
+- QGC flying the drone isn't watched. If only QGC disconnects, the FC's GCS failsafe lands it.
+- The control center's kill bar shows `WATCHDOG LIVE` when the whole chain works. Check it before every arming.
+
+```bash
+sudo systemctl status kill-switch     # running?
+journalctl -u kill-switch -f          # link up/lost, KILL and disarm events
+```
+
+**Test it before flying, with the props off:** arm, then (1) press KILL and (2) re-arm and close the control center tab. The FC should disarm within about 1 s each time.
 
 ## Connecting a laptop GCS
 
