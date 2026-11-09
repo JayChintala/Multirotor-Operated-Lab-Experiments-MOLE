@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.8)
+project(emsd_drone_description)
+find_package(ament_cmake REQUIRED)
+set(EMSD_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
+add_subdirectory("${EMSD_ROOT}/simulation" "${CMAKE_CURRENT_BINARY_DIR}/physics")
+install(DIRECTORY launch urdf meshes rviz worlds DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY "${EMSD_ROOT}/control/" DESTINATION share/${PROJECT_NAME}/control
+  PATTERN "__pycache__" EXCLUDE)
+install(TARGETS emsd_motor_physics LIBRARY DESTINATION lib)
+install(TARGETS emsd_headless RUNTIME DESTINATION lib/${PROJECT_NAME})
+ament_package()

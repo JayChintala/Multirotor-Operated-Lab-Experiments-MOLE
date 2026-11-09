@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.py[cod]
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+simulation/build/
+simulation/runs/
+analysis/notion/
+analysis/physics_validation/
+analysis/motor_identification/*.csv
+analysis/motor_identification/*.json
+analysis/motor_identification/*.png
+analysis/motor_identification/*.pdf
+emsd_ros_github_bundle.zip
+analysis/motor_identification/EMSD_motor_models_and_plots.zip

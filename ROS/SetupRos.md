@@ -1,21 +1,36 @@
 # EMSD setup and reproduction guide
 
-This repository runs a four-motor drone model in ROS 2 Humble, Gazebo Fortress,
-and RViz. The ZIP beside this guide contains the source and input data needed to
+This repository runs a four-motor drone model in ROS 2 (Jazzy or Humble), Gazebo
+(Harmonic or Fortress), and RViz. The ZIP beside this guide contains the source and input data needed to
 rebuild it on another computer. Keep the directory layout intact: the ROS
 package's `CMakeLists.txt` reaches `simulation/` and `control/` through relative
 paths.
 
 ## 1. Platform and prerequisites
 
-Use **Ubuntu 22.04 (Jammy), ROS 2 Humble, and Gazebo Fortress**. This project
-uses Fortress's `ignition-gazebo6` and DART C++ APIs, so another ROS/Gazebo
-pairing requires code and build changes. For ROS installation and repository
-setup, follow the [official ROS 2 Humble Ubuntu instructions](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html).
-The [Gazebo ROS installation guide](https://gazebosim.org/docs/latest/ros_installation/)
-documents the Humble/Fortress pairing.
+Two platforms are supported. The build detects which Gazebo is installed
+(Harmonic first, then Fortress); force one with `-DEMSD_GZ=fortress` at build
+time and `EMSD_GZ=fortress` at run time.
 
-After ROS's apt repository is configured, install the project dependencies:
+| Ubuntu | ROS 2 | Gazebo | `<distro>` below |
+| --- | --- | --- | --- |
+| 24.04 (Noble) | [Jazzy](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html) | Harmonic (gz-sim8) | `jazzy` |
+| 22.04 (Jammy) | [Humble](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html) | Fortress (ignition-gazebo6) | `humble` |
+
+The [Gazebo ROS installation guide](https://gazebosim.org/docs/latest/ros_installation/)
+documents both pairings. After ROS's apt repository is configured, install the
+project dependencies.
+
+Jazzy / Harmonic (Gazebo headers come with `ros-jazzy-ros-gz`):
+
+```bash
+sudo apt update
+sudo apt install ros-jazzy-desktop ros-jazzy-ros-gz \
+  python3-colcon-common-extensions python3-numpy python3-scipy \
+  python3-matplotlib python3-dev cmake g++
+```
+
+Humble / Fortress:
 
 ```bash
 sudo apt update
@@ -25,7 +40,7 @@ sudo apt install ros-humble-desktop ros-humble-ros-gz \
   libignition-gazebo6-dev libignition-physics5-dev libignition-plugin1-dev
 ```
 
-`ros-humble-desktop` supplies RViz and `robot_state_publisher`. `ros-humble-ros-gz`
+`ros-<distro>-desktop` supplies RViz and `robot_state_publisher`. `ros-<distro>-ros-gz`
 supplies the Gazebo integration. The development packages and C++ toolchain build
 the custom motor physics plugin and direct DART runner. NumPy and SciPy are used
 by the controller. Matplotlib is only needed for analysis plots.
@@ -35,7 +50,7 @@ one top-level `EMSD/` directory. From then on, use its project root:
 
 ```bash
 cd /path/to/EMSD
-source /opt/ros/humble/setup.bash
+source /opt/ros/<distro>/setup.bash
 ```
 
 Use system `python3` for the commands below. A copied Python virtual environment
@@ -48,7 +63,7 @@ CadQuery, which is not needed to build or run the supplied meshes.
 
 ```bash
 cd /path/to/EMSD
-source /opt/ros/humble/setup.bash
+source /opt/ros/<distro>/setup.bash
 cd ros2_ws
 colcon build --symlink-install
 source install/setup.bash
@@ -56,7 +71,7 @@ ros2 pkg prefix emsd_drone_description
 ```
 
 The last command should print a path under `ros2_ws/install`. In each new
-terminal, source `/opt/ros/humble/setup.bash` and then
+terminal, source `/opt/ros/<distro>/setup.bash` and then
 `/path/to/EMSD/ros2_ws/install/setup.bash`. The `build/`, `install/`, and `log/`
 directories are generated locally by colcon and are intentionally excluded
 from the bundle.

@@ -1,0 +1,7 @@
+{
+  "density_kg_m3": 1000.0,
+  "center_m": [2.0, 3.0],
+  "radius_m": 1.9999,
+  "surface_z_m": -0.005,
+  "bottom_z_m": -2.0
+}

@@ -1,0 +1,121 @@
+{
+  "assumptions": "244 g is approximate central frame plus electronics, excluding four arms and four motors. Uniform shared density inferred from four CAD arm volumes and 42 g per arm. All 15 non-arm CAD solids use this density, including small brackets and standoffs. Electronics is the residual of 244 g minus CAD central-frame mass, modeled as a point at total CoM. Four 72 g motors modeled as points at provisional mount coordinates; motor own-body/rotor inertia omitted. Original CAD axes assumed controller body axes; added batteries, propellers or payloads are not separately modeled. Motor lag and drag are assumed, not identified.",
+  "mass_kg": 0.7000000000000001,
+  "com_m": [
+    1.720582648685968e-07,
+    2.627656599043069e-05,
+    -0.002134759031594773
+  ],
+  "inertia_kg_m2": [
+    0.007085058781209902,
+    0.012035959562662062,
+    0.01907871088349844
+  ],
+  "motor_positions_m": [
+    [
+      0.184,
+      0.14,
+      -0.0025
+    ],
+    [
+      -0.184,
+      0.14,
+      -0.0025
+    ],
+    [
+      -0.184,
+      -0.14,
+      -0.0025
+    ],
+    [
+      0.184,
+      -0.14,
+      -0.0025
+    ]
+  ],
+  "yaw_signs": [
+    1,
+    -1,
+    1,
+    -1
+  ],
+  "motor_tables": [
+    "../motor_data.csv",
+    "../motor_data.csv",
+    "../motor_data.csv",
+    "../motor_data.csv"
+  ],
+  "motor_time_constant_s": [
+    0.04,
+    0.04,
+    0.04,
+    0.04
+  ],
+  "linear_drag_n_per_m_s": 0.15,
+  "angular_drag_nm_per_rad_s": 0.01,
+  "physics_step_s": 0.002,
+  "control_period_s": 0.01,
+  "rate_kp": [
+    0.16,
+    0.2,
+    0.12
+  ],
+  "rate_ki": [
+    0.02,
+    0.02,
+    0.01
+  ],
+  "rate_kd": [
+    0.002,
+    0.003,
+    0.002
+  ],
+  "integral_limit": [
+    0.3,
+    0.3,
+    0.3
+  ],
+  "torque_limit_nm": [
+    0.5,
+    0.5,
+    0.25
+  ],
+  "attitude_kp": [
+    4.0,
+    4.0,
+    2.0
+  ],
+  "position_kp": [
+    1.5,
+    1.5,
+    3.0
+  ],
+  "velocity_kd": [
+    2.4,
+    2.4,
+    3.0
+  ],
+  "max_tilt_deg": 25.0,
+  "wrench_scales": [
+    1.0,
+    0.1,
+    0.1,
+    0.01
+  ],
+  "reference": {
+    "altitude_m": 1.5,
+    "takeoff_s": 5.0,
+    "path_start_s": 8.0,
+    "period_s": 30.0,
+    "amplitude_m": [
+      2.0,
+      1.5
+    ],
+    "yaw_deg": 0.0
+  },
+  "inertia_products_kg_m2": [
+    -1.2371386449994137e-09,
+    -2.7759223063302126e-09,
+    -5.955413948314262e-06
+  ]
+}

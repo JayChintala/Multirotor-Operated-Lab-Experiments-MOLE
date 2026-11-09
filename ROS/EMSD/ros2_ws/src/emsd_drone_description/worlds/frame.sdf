@@ -1,0 +1,158 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf version="1.8">
+  <world name="emsd">
+    <physics name="default" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics" />
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands" />
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster" />
+    <scene>
+      <ambient>0.6 0.6 0.6 1</ambient>
+      <background>0.75 0.80 0.85 1</background>
+      <shadows>true</shadows>
+    </scene>
+    <light name="sun" type="directional">
+      <pose>0 0 5 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <direction>-0.5 0.2 -1</direction>
+    </light>
+    <model name="ground">
+      <static>true</static>
+      <link name="ground">
+        <collision name="collision">
+          <geometry>
+            <mesh>
+              <uri>__GROUND_MESH_URI__</uri>
+            </mesh>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <mesh>
+              <uri>__GROUND_MESH_URI__</uri>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>0.12 0.48 0.10 1</ambient>
+            <diffuse>0.12 0.48 0.10 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="pond">
+      <static>true</static>
+      <pose>2 3 0 0 0 0</pose>
+      <link name="basin">
+        <collision name="bowl_collision">
+          <geometry>
+            <mesh>
+              <uri>__POND_MESH_URI__</uri>
+            </mesh>
+          </geometry>
+        </collision>
+        <visual name="bowl">
+          <geometry>
+            <mesh>
+              <uri>__POND_MESH_URI__</uri>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>0.30 0.24 0.13 1</ambient>
+            <diffuse>0.40 0.32 0.18 1</diffuse>
+          </material>
+        </visual>
+        <visual name="water">
+          <pose>0 0 -0.015 0 0 0</pose>
+          <geometry>
+            <cylinder>
+              <radius>1.9999</radius>
+              <length>0.02</length>
+            </cylinder>
+          </geometry>
+          <transparency>0.3</transparency>
+          <material>
+            <ambient>0.02 0.35 0.55 1</ambient>
+            <diffuse>0.02 0.45 0.70 1</diffuse>
+            <specular>0.8 0.9 1 1</specular>
+            <shininess>80</shininess>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="emsd_drone_frame">
+      <static>true</static>
+      <pose>0 0 0.15 0 0 0</pose>
+      <link name="base_link">
+        <visual name="frame">
+          <geometry>
+            <mesh>
+              <uri>__FRAME_MESH_URI__</uri>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>0.16 0.20 0.25 1</ambient>
+            <diffuse>0.24 0.30 0.38 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="motor_1">
+        <pose>0.184 0.14 0.0075 0 0 0</pose>
+        <visual name="motor_1">
+          <geometry>
+            <cylinder>
+              <radius>0.014</radius>
+              <length>0.020</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <diffuse>0.15 0.35 0.75 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="motor_2">
+        <pose>-0.184 0.14 0.0075 0 0 0</pose>
+        <visual name="motor_2">
+          <geometry>
+            <cylinder>
+              <radius>0.014</radius>
+              <length>0.020</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <diffuse>0.75 0.25 0.12 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="motor_3">
+        <pose>-0.184 -0.14 0.0075 0 0 0</pose>
+        <visual name="motor_3">
+          <geometry>
+            <cylinder>
+              <radius>0.014</radius>
+              <length>0.020</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <diffuse>0.15 0.35 0.75 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="motor_4">
+        <pose>0.184 -0.14 0.0075 0 0 0</pose>
+        <visual name="motor_4">
+          <geometry>
+            <cylinder>
+              <radius>0.014</radius>
+              <length>0.020</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <diffuse>0.75 0.25 0.12 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

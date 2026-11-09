@@ -1,0 +1,21 @@
+{
+  "source": "QAV-RXL2_8inch.step",
+  "mesh_units": "metres",
+  "dimensions_m": [
+    0.40634994946002356,
+    0.31965067457312357,
+    0.04150795932347731
+  ],
+  "bounds_min_m": [
+    -0.20317497473001178,
+    -0.15982533728656179,
+    -0.010502516918649073
+  ],
+  "bounds_max_m": [
+    0.20317497473001178,
+    0.15982533728656179,
+    0.03100544240482824
+  ],
+  "solid_count": 19,
+  "orientation": "Original CAD axes; verify Z-up and X-forward before simulation."
+}
