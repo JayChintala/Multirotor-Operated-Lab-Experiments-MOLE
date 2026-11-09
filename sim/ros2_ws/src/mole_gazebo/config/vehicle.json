@@ -1,0 +1,62 @@
+{
+  "_comment": "Inputs for scripts/gen_model.py. Body axes: x forward, y left, z up; origin at the CAD origin (frame centre). Re-run gen_model.py after editing.",
+
+  "frame": {
+    "_source": "ROS/EMSD cad/mass_properties.json (QAV-RXL2 CAD; frame, arms, motors, Pi, FC, ESC and wiring)",
+    "mass_kg": 0.700,
+    "com_cad_m": [1.720582648685968e-07, 2.627656599043069e-05, -0.002134759031594773],
+    "inertia_cad_kg_m2": {"ixx": 0.007085058781209902, "iyy": 0.012035959562662062, "izz": 0.01907871088349844,
+                          "ixy": -1.2371386449994137e-09, "ixz": -2.7759223063302126e-09, "iyz": -5.955413948314262e-06},
+    "_cad_to_body": "The real front is CAD -y, so body = CAD rotated +90 deg about z (confirmed by the team 2026-11-08)",
+    "cad_yaw_deg": 90,
+    "mesh": "meshes/frame.stl",
+    "bottom_z_m": -0.0105,
+    "top_z_m": 0.031,
+    "footprint_m": [0.3197, 0.4063]
+  },
+
+  "battery": {
+    "_source": "Team measurement 2026-11-08 (6S 12000 mAh). Mass to be re-measured; 1.58 kg also quoted.",
+    "mass_kg": 1.500,
+    "size_m": [0.195, 0.077, 0.050],
+    "_mount": "on top of the frame, long side front to back",
+    "bottom_z_m": 0.031
+  },
+
+  "props": {
+    "_source": "Team: 8 inch, 13 g each",
+    "mass_kg": 0.013,
+    "diameter_m": 0.2032,
+    "spin_inertia_kg_m2": 4.0e-5,
+    "_spin_inertia": "estimate: 2-blade prop (~3e-5) plus motor bell (~7e-6)",
+    "z_m": 0.0225
+  },
+
+  "motors": {
+    "_source_layout": "Motor positions from EMSD drone.json, rotated to body axes. Spin from companion/README.md (verified 2026-10-26). Outputs from FC log 00016 (SERVO1..4_FUNCTION = 36,33,34,35).",
+    "list": [
+      {"name": "front_right", "ardupilot_motor": 1, "servo_output": 2, "xy_m": [0.140, -0.184], "spin": "ccw"},
+      {"name": "rear_left",   "ardupilot_motor": 2, "servo_output": 3, "xy_m": [-0.140, 0.184], "spin": "ccw"},
+      {"name": "front_left",  "ardupilot_motor": 3, "servo_output": 4, "xy_m": [0.140, 0.184],  "spin": "cw"},
+      {"name": "rear_right",  "ardupilot_motor": 4, "servo_output": 1, "xy_m": [-0.140, -0.184], "spin": "cw"}
+    ],
+    "_source_curve": "ROS/EMSD motor_data.xlsx (sheet MQ1053B_6s_StepsTest_thrust_1_r, DShot300, ~24.7 V); fits in sim/README.md",
+    "thrust_coeff_n_per_rad_s2": 6.983e-06,
+    "torque_coeff_nm_per_rad_s2": 1.019e-07,
+    "_speed_map": "rad/s = speed_per_cmd * (cmd + speed_offset), cmd = (PWM-1000)/1000; linear fit of the DC-motor model over cmd 0.15-0.95",
+    "speed_per_cmd_rad_s": 2213.8,
+    "speed_offset": 0.0481,
+    "max_torque_nm": 0.289,
+    "_max_torque": "torque at the bench test's top point: 2.0 kgf at 34.5 A (DShot 1500). The team confirms ~2 kg per motor at ~35 A is the real maximum, so the motor torque is capped here (a current limit); outputs above ~0.73 give no more thrust.",
+    "time_constant_s": 0.02,
+    "_time_constant": "assumed (not resolved by the bench test); typical for 8 inch props"
+  },
+
+  "aero": {
+    "_comment": "Blade-element constants for Gazebo's LiftDrag system; gen_model.py sizes blade area and drag to hit thrust_coeff and torque_coeff.",
+    "air_density_kg_m3": 1.2041,
+    "cla": 4.25,
+    "a0": 0.3,
+    "cp_fraction_of_radius": 0.7
+  }
+}

@@ -1,0 +1,5 @@
+# Variant "gps:=true" (default): simulated GPS and compass, so Loiter, Guided,
+# Auto and RTL work. The real drone has neither module fitted yet.
+SIM_GPS1_TYPE    1
+GPS1_TYPE        1
+COMPASS_ENABLE   1

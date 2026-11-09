@@ -1,0 +1,9 @@
+# Sim-only settings, loaded after mole_quad.parm. Each one replaces something
+# that only exists on the real hardware.
+AHRS_ORIENTATION 0      # real FC is mounted roll-180 (8); the simulated IMU is level
+MOT_SAFE_DISARM  1      # no motor output while disarmed, like DShot "stop" on the real ESC
+LOG_BACKEND_TYPE 1      # log to file in the run folder (real FC streams logs to the Pi)
+LOG_DISARMED     0
+BATT_MONITOR     4      # SITL's simulated voltage/current sensor
+SIM_BATT_VOLTAGE 25.2   # full 6S pack (real BATT_ARM_VOLT is 22.0 V)
+SIM_BATT_CAP_AH  12     # 12000 mAh

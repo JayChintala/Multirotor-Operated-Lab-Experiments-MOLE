@@ -1,0 +1,4 @@
+# Variant "gps:=false": matches the real drone today (no GPS or compass).
+# Only non-position modes work: Stabilize, AltHold, Acro.
+SIM_GPS1_TYPE    0
+COMPASS_ENABLE   0
