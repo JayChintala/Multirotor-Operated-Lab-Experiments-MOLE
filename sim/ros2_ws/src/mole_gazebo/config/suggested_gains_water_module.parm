@@ -1,0 +1,15 @@
+# Suggested roll/pitch rate gains with the water module fitted and MOT_SPIN_MAX 0.73
+# (simulation, 2026-11-15). These are the real FC's gains x0.6.
+#
+# Simulated stability with module + MOT_SPIN_MAX 0.73:
+#   gains x0.6  steady (0.2 deg/s)     gains x1.0  steady (0.2 deg/s)
+#   gains x1.1  steady (0.5 deg/s)     gains x1.25 oscillates (71 deg/s RMS)
+# x0.6 leaves about 2x gain margin to the simulated oscillation boundary (~x1.15-1.2),
+# because the model (motor lag, inertia, no vibration) is not calibrated against a real flight.
+# Load in MAVProxy or Mission Planner for a first careful hover; then tune on the real drone.
+ATC_RAT_RLL_P 0.081
+ATC_RAT_RLL_I 0.081
+ATC_RAT_RLL_D 0.00216
+ATC_RAT_PIT_P 0.081
+ATC_RAT_PIT_I 0.081
+ATC_RAT_PIT_D 0.00216

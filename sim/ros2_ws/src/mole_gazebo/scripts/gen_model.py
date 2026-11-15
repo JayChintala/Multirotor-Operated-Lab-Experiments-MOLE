@@ -6,10 +6,13 @@ Gazebo model: combined rigid-body mass and inertia, four propeller joints with
 blade lift/drag sized to the measured thrust and torque curves, the IMU, and
 the ArduPilot plugin wired to the real flight controller's output channels.
 
-    python3 scripts/gen_model.py          # from the package directory
+    python3 scripts/gen_model.py                    # from the package directory
+    python3 scripts/gen_model.py --load water=0     # override a load's mass (0 = empty)
 """
+import argparse
 import json
 import math
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import numpy as np
@@ -48,7 +51,50 @@ def material(r, g, b, a=1.0):
             f'<specular>0.2 0.2 0.2 1</specular></material>')
 
 
+def urdf_mass_properties(path):
+    """Total mass, CoM and inertia about the CoM of a URDF whose links hang off the root by fixed joints."""
+    root = ET.parse(path).getroot()
+    offset = {}
+    for j in root.findall('joint'):
+        if j.get('type') != 'fixed':
+            raise ValueError(f'{path}: joint {j.get("name")} is not fixed')
+        o = j.find('origin')
+        if o is not None and any(float(a) for a in o.get('rpy', '0 0 0').split()):
+            raise ValueError(f'{path}: rotated joints are not supported')
+        offset[j.find('child').get('link')] = (j.find('parent').get('link'),
+                                               np.array([float(a) for a in (o.get('xyz') if o is not None else '0 0 0').split()]))
+
+    def link_pos(name):
+        pos = np.zeros(3)
+        while name in offset:
+            name, xyz = offset[name]
+            pos = pos + xyz
+        return pos
+
+    parts = []
+    for link in root.findall('link'):
+        inertial = link.find('inertial')
+        if inertial is None:
+            continue
+        o = inertial.find('origin')
+        com = np.array([float(a) for a in (o.get('xyz') if o is not None else '0 0 0').split()])
+        a = inertial.find('inertia').attrib
+        I = np.array([[float(a['ixx']), float(a['ixy']), float(a['ixz'])],
+                      [float(a['ixy']), float(a['iyy']), float(a['iyz'])],
+                      [float(a['ixz']), float(a['iyz']), float(a['izz'])]])
+        parts.append((float(inertial.find('mass').get('value')), link_pos(link.get('name')) + com, I))
+    return combine(parts)
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--load', action='append', default=[], metavar='NAME=KG',
+                        help='override the mass of a load from vehicle.json (0 removes it)')
+    args = parser.parse_args()
+    overrides = {}
+    for item in args.load:
+        name, kg = item.split('=')
+        overrides[name] = float(kg)
     v = json.loads((PKG / 'config/vehicle.json').read_text())
     fr, bat, prop, mot, aero = v['frame'], v['battery'], v['props'], v['motors'], v['aero']
 
@@ -60,14 +106,42 @@ def main():
     bx, by, bz = bat['size_m']
     bat_com = np.array([0.0, 0.0, bat['bottom_z_m'] + bz / 2])
     bat_part = (bat['mass_kg'], bat_com, box_inertia(bat['mass_kg'], bx, by, bz))
-    base_m, base_com, base_I = combine([frame_part, bat_part])
+    payloads = []
+    for pl in v.get('payloads', []):
+        if not pl.get('enabled', True):
+            continue
+        pm_, pcom_mod, pI_mod = urdf_mass_properties(PKG / pl['urdf'])
+        Rp = rot_z(pl['yaw_deg'])
+        # Module origin placed so its top face (top_z_m in module axes) sits at mount_top_z_m in body axes.
+        origin = np.array([*pl['mount_xy_m'], pl['mount_top_z_m'] - pl['top_z_m']])
+        pcom = origin + Rp @ pcom_mod
+        size = np.array(pl['box_size_m'])                     # body axes
+        box_centre = np.array([*pl['mount_xy_m'], pl['mount_top_z_m'] - size[2] / 2])
+        payloads.append({'name': pl['name'], 'mass': pm_, 'com': pcom, 'I': Rp @ pI_mod @ Rp.T,
+                         'size': size, 'centre': box_centre})
+    base_m, base_com, base_I = combine([frame_part, bat_part]
+                                       + [(p['mass'], p['com'], p['I']) for p in payloads])
+
+    # Loads carried inside a payload (e.g. water): separate links, fixed to base_link for now.
+    loads = []
+    for ld in v.get('loads', []):
+        mass = overrides.get(ld['name'], ld['mass_kg'] if ld.get('enabled', True) else 0.0)
+        if mass <= 0:
+            continue
+        host = next(p for p in payloads if p['name'] == ld['inside'])
+        size = host['size'] * np.array([1.0, 1.0, ld['fill_height_fraction']])
+        bottom = host['centre'][2] - host['size'][2] / 2
+        centre = np.array([host['centre'][0], host['centre'][1], bottom + size[2] / 2])
+        loads.append({'name': ld['name'], 'mass': mass, 'size': size, 'centre': centre,
+                      'I': box_inertia(mass, *size)})
 
     # Props as separate spinning links (thin rod about z for the spin inertia).
     pm, pr, pj = prop['mass_kg'], prop['diameter_m'] / 2, prop['spin_inertia_kg_m2']
     prop_I = np.diag([1e-7, pj, pj])
     total_m, total_com, total_I = combine(
         [(base_m, base_com, base_I)]
-        + [(pm, np.array([*m['xy_m'], prop['z_m']]), prop_I) for m in mot['list']])
+        + [(pm, np.array([*m['xy_m'], prop['z_m']]), prop_I) for m in mot['list']]
+        + [(ld['mass'], ld['centre'], ld['I']) for ld in loads])
 
     # Blade lift/drag: two blades per rotor at cp = 0.7 R.
     # Hover thrust T = rho (w r)^2 A cla a0  ->  A; torque/thrust = cda r / cla -> cda.
@@ -81,10 +155,16 @@ def main():
     tau = mot['time_constant_s']
     p_gain = pj / tau
     i_gain = p_gain ** 2 / (4 * 0.8 ** 2 * pj)          # damping ratio 0.8
-    # Motor torque limit (current limit): caps rotor speed and thrust at the measured maximum.
-    cmd_max = mot['max_torque_nm']
-    w_max = math.sqrt(cmd_max / kQ)
-    torque_max = cmd_max
+    if mot.get('max_torque_nm'):
+        # Motor torque limit (current limit): caps rotor speed and thrust.
+        cmd_max = mot['max_torque_nm']
+        w_max = math.sqrt(cmd_max / kQ)
+    else:
+        # Real hardware, no current limit: full output reaches the extrapolated top speed.
+        # Limits on the real drone are set in firmware (MOT_SPIN_MAX), which SITL applies too.
+        w_max = mot['speed_per_cmd_rad_s'] * (1 + mot['speed_offset'])
+        cmd_max = 2.0 * kQ * w_max ** 2                       # torque headroom to accelerate the rotor
+    torque_max = kQ * w_max ** 2
 
     rotors, liftdrag, controls = [], [], []
     for k, m in enumerate(mot['list']):
@@ -168,6 +248,38 @@ def main():
         {material(0.08, 0.08, 0.08)}
       </visual>''' for m in mot['list'])
 
+    payload_xml = ''.join(f'''
+      <collision name="{p['name']}_collision">
+        <pose>{p['centre'][0]:.4f} {p['centre'][1]:.4f} {p['centre'][2]:.4f} 0 0 0</pose>
+        <geometry><box><size>{p['size'][0]} {p['size'][1]} {p['size'][2]}</size></box></geometry>
+      </collision>
+      <visual name="{p['name']}">
+        <pose>{p['centre'][0]:.4f} {p['centre'][1]:.4f} {p['centre'][2]:.4f} 0 0 0</pose>
+        <geometry><box><size>{p['size'][0]} {p['size'][1]} {p['size'][2]}</size></box></geometry>
+        <transparency>0.6</transparency>
+        {material(0.75, 0.78, 0.82, 0.4)}
+      </visual>''' for p in payloads)
+
+    load_xml = ''.join(f'''
+    <link name="{ld['name']}">
+      <pose>{ld['centre'][0]:.4f} {ld['centre'][1]:.4f} {ld['centre'][2]:.4f} 0 0 0</pose>
+      <inertial>
+        <mass>{ld['mass']:.4f}</mass>
+        <inertia>
+{inertia_xml(ld['I'], 10)}
+        </inertia>
+      </inertial>
+      <visual name="{ld['name']}_visual">
+        <geometry><box><size>{ld['size'][0] * 0.98:.4f} {ld['size'][1] * 0.98:.4f} {ld['size'][2]:.4f}</size></box></geometry>
+        <transparency>0.3</transparency>
+        {material(0.1, 0.35, 0.95, 0.7)}
+      </visual>
+    </link>
+    <joint name="{ld['name']}_mount" type="fixed">
+      <parent>base_link</parent>
+      <child>{ld['name']}</child>
+    </joint>''' for ld in loads)
+
     sdf = f'''<?xml version="1.0"?>
 <!-- GENERATED by scripts/gen_model.py from config/vehicle.json. Do not edit by hand. -->
 <!-- Total {total_m:.3f} kg; CoG {np.round(total_com * 1000, 1).tolist()} mm; inertia diag {np.round(np.diag(total_I), 5).tolist()} kg m^2 -->
@@ -189,6 +301,7 @@ def main():
         <pose>{bat_com[0]} {bat_com[1]} {bat_com[2]:.4f} 0 0 0</pose>
         <geometry><box><size>{bx} {by} {bz}</size></box></geometry>
       </collision>
+{payload_xml}
       <visual name="frame">
         <pose>0 0 0 0 0 {yaw:.6f}</pose>
         <geometry><mesh><uri>model://mole_quad/{fr['mesh']}</uri></mesh></geometry>
@@ -211,6 +324,7 @@ def main():
       </sensor>
     </link>
 {''.join(rotors)}
+{load_xml}
 {''.join(liftdrag)}
 
     <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher"/>
@@ -240,14 +354,29 @@ def main():
 </model>
 ''')
     print(f'Wrote {out}')
+    for p in payloads:
+        print(f'  payload {p["name"]}: {p["mass"] * 1000:.1f} g, CoM {np.round(p["com"] * 1000, 1)} mm, '
+              f'box {np.round(p["size"] * 1000).astype(int).tolist()} mm')
+    for ld in loads:
+        vol = np.prod(ld['size']) * 1e6
+        print(f'  load {ld["name"]}: {ld["mass"] * 1000:.0f} g in a {np.round(ld["size"] * 1000, 1).tolist()} mm '
+              f'block ({vol:.0f} ml), centre {np.round(ld["centre"] * 1000, 1).tolist()} mm')
     print(f'  total mass {total_m:.3f} kg, CoG {np.round(total_com * 1000, 1)} mm')
     print(f'  inertia diag {np.round(np.diag(total_I), 5)} kg m^2')
     print(f'  blade area {blade_area:.3e} m^2 at r_cp {r_cp:.4f} m, cda {cda:.4f}')
-    print(f'  rotor PI p={p_gain:.4g} i={i_gain:.4g}; torque cap {torque_max:.3f} Nm -> max {w_max:.0f} rad/s, '
+    print(f'  rotor PI p={p_gain:.4g} i={i_gain:.4g}; full-output torque {torque_max:.3f} Nm, {w_max:.0f} rad/s, '
           f'{kT * w_max ** 2:.2f} N ({kT * w_max ** 2 / 9.80665:.2f} kgf) per motor, '
           f'thrust/weight {4 * kT * w_max ** 2 / (total_m * 9.80665):.2f}')
     w_h = math.sqrt(total_m * 9.80665 / 4 / kT)
-    print(f'  expected hover: {w_h:.0f} rad/s, cmd {w_h / mot["speed_per_cmd_rad_s"] - mot["speed_offset"]:.3f}')
+    hover_cmd = w_h / mot['speed_per_cmd_rad_s'] - mot['speed_offset']
+    print(f'  expected hover: {w_h:.0f} rad/s, cmd {hover_cmd:.3f}')
+    lowest = min([fr['bottom_z_m']] + [p['centre'][2] - p['size'][2] / 2 for p in payloads])
+    (PKG / 'models/mole_quad/predicted.json').write_text(json.dumps({
+        '_comment': 'Written by gen_model.py; read by smoke_test.py',
+        'total_mass_kg': round(total_m, 4), 'hover_cmd': round(hover_cmd, 4),
+        'payloads': [p['name'] for p in payloads] + [f"{ld['name']} {ld['mass'] * 1000:.0f} g" for ld in loads],
+        'lowest_point_z_m': round(lowest, 4)}, indent=2) + '\n')
+    print(f'  lowest point {lowest * 1000:.0f} mm below the frame centre: spawn the model at least that high')
 
 
 if __name__ == '__main__':

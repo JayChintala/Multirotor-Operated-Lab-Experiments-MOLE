@@ -39,6 +39,7 @@ def sitl(context):
     gps = LaunchConfiguration('gps').perform(context).lower() == 'true'
     defaults = [ardupilot / 'Tools/autotest/default_params/copter.parm',
                 share / 'config/mole_quad.parm',
+                share / 'config/planned_changes.parm',
                 share / 'config/sitl_overrides.parm',
                 share / f'config/sitl_{"gps" if gps else "nogps"}.parm']
     run = Path(LaunchConfiguration('run_dir').perform(context)).expanduser() / time.strftime('%Y%m%d_%H%M%S')

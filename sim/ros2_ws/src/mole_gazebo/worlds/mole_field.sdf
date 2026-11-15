@@ -64,7 +64,9 @@
     <include>
       <uri>model://mole_quad</uri>
       <name>mole_quad</name>
-      <pose degrees="true">0 0 0.0115 0 0 90</pose>
+      <!-- Spawn height must clear the model's lowest point (models/mole_quad/predicted.json):
+           106 mm with the water module fitted. It drops the last centimetre on start. -->
+      <pose degrees="true">0 0 0.12 0 0 90</pose>
     </include>
   </world>
 </sdf>

@@ -28,7 +28,12 @@ from pymavlink import mavutil
 # Motor test order A-D is clockwise from front-right; expected rotor and spin (+ = CCW from above).
 MOTOR_TEST = [('A', 'rotor_front_right', +1), ('B', 'rotor_rear_right', -1),
               ('C', 'rotor_rear_left', +1), ('D', 'rotor_front_left', -1)]
-EXPECTED_HOVER = 0.35            # real FC MOT_THST_HOVER and the motor-data prediction
+import json
+from pathlib import Path
+# Hover motor output predicted by gen_model.py for the current model (payloads included).
+# Without payloads it is 0.354, matching the real FC's MOT_THST_HOVER of 0.35.
+_PREDICTED = json.loads((Path(__file__).resolve().parents[1] / 'models/mole_quad/predicted.json').read_text())
+EXPECTED_HOVER = _PREDICTED['hover_cmd']
 WORLD, MODEL = 'mole_field', 'mole_quad'
 
 results = []
@@ -69,6 +74,7 @@ class Vehicle:
             raise RuntimeError(f'no autopilot heartbeat on {url}')
         self.rc = [0] * 8
         self.state = {}
+        self.texts = []                   # STATUSTEXT messages from the FC
         # This link gets no telemetry until asked: request what the checks read, at 10 Hz.
         for msg_id in (mavutil.mavlink.MAVLINK_MSG_ID_SERVO_OUTPUT_RAW, mavutil.mavlink.MAVLINK_MSG_ID_VFR_HUD,
                        mavutil.mavlink.MAVLINK_MSG_ID_GLOBAL_POSITION_INT, mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE):
@@ -92,6 +98,7 @@ class Vehicle:
                     continue              # e.g. MAVROS's own heartbeat, forwarded by the FC
                 self.state[t] = msg
                 if t == 'STATUSTEXT':
+                    self.texts.append(msg.text)
                     print(f'      FC: {msg.text}', flush=True)
             time.sleep(0.1)
 
@@ -189,10 +196,11 @@ def flight(v):
     held = max(alts) - min(alts) < 0.5
     check('hold altitude for 6 s', held, f'height {min(alts):.2f}-{max(alts):.2f} m')
     if held and wobble < 10:
-        check('hover throttle near real drone', abs(hover - EXPECTED_HOVER) < 0.06,
-              f'mean motor output {hover:.3f} (real MOT_THST_HOVER 0.35)')
+        check('hover throttle matches the model', abs(hover - EXPECTED_HOVER) < 0.04,
+              f'mean motor output {hover:.3f}, predicted {EXPECTED_HOVER:.3f} '
+              f'({_PREDICTED["total_mass_kg"]} kg, payloads: {", ".join(_PREDICTED["payloads"]) or "none"})')
     else:
-        check('hover throttle near real drone', False, 'not measured: the drone was not in a steady hover')
+        check('hover throttle matches the model', False, 'not measured: the drone was not in a steady hover')
 
     print('3. Yaw right for 2 s', flush=True)
     h0 = v.get('VFR_HUD').heading
@@ -207,8 +215,13 @@ def flight(v):
     v.rc[2] = 1300                       # descend
     v.wait(lambda: height() < 0.3, 40)
     time.sleep(2)
+    n_texts = len(v.texts)
     v.rc[2] = 1000                       # stick fully down so ArduPilot auto-disarms
-    check('land and auto-disarm', v.wait(lambda: not v.armed(), 30), f'height {height():.2f} m')
+    disarmed = v.wait(lambda: not v.armed(), 30)
+    time.sleep(1)
+    crashed = [t for t in v.texts[n_texts:] if 'Crash' in t]
+    check('land and auto-disarm', disarmed and not crashed,
+          f'crash detector fired: {crashed[0]}' if crashed else f'height {height():.2f} m')
 
 
 def main():

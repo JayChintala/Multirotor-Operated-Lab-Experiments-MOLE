@@ -46,11 +46,40 @@
     "_speed_map": "rad/s = speed_per_cmd * (cmd + speed_offset), cmd = (PWM-1000)/1000; linear fit of the DC-motor model over cmd 0.15-0.95",
     "speed_per_cmd_rad_s": 2213.8,
     "speed_offset": 0.0481,
-    "max_torque_nm": 0.289,
-    "_max_torque": "torque at the bench test's top point: 2.0 kgf at 34.5 A (DShot 1500). The team confirms ~2 kg per motor at ~35 A is the real maximum, so the motor torque is capped here (a current limit); outputs above ~0.73 give no more thrust.",
+    "max_torque_nm": null,
+    "_max_torque": "null = real hardware, no current limit: full output reaches ~2320 rad/s, ~3.8 kgf, ~60 A (extrapolated beyond the bench test's top point of 2.0 kgf / 34.5 A at DShot 1500). The team limits current in firmware with MOT_SPIN_MAX (config/planned_changes.parm). A number here caps motor torque in the model instead (0.289 = 2.0 kgf).",
     "time_constant_s": 0.02,
     "_time_constant": "assumed (not resolved by the bench test); typical for 8 inch props"
   },
+
+  "payloads": [
+    {
+      "name": "water_module",
+      "enabled": true,
+      "_source": "config/payloads/water_module.urdf, from branch manan commit 33f060d (2026-11-15): 20 parts, 482 g, mass properties from STEP normalised to the measured mass. Its meshes are not on GitHub, so the model shows a box.",
+      "urdf": "config/payloads/water_module.urdf",
+      "_mount": "Team 2026-11-15: centred under the frame, long side (module y, 186 mm) side to side, so no rotation.",
+      "mount_xy_m": [0.0, 0.0],
+      "mount_top_z_m": -0.0105,
+      "yaw_deg": 0,
+      "top_z_m": 0.0425,
+      "_top_z": "ASSUMED: module top face height in its own axes = CoM z (-4.95 mm) + half the equivalent box height (47.5 mm). Check against the CAD.",
+      "box_size_m": [0.096, 0.186, 0.095],
+      "_box_size": "solid box with the module's mass and principal inertias (body axes), used for collision and display"
+    }
+  ],
+
+  "loads": [
+    {
+      "name": "water",
+      "enabled": true,
+      "inside": "water_module",
+      "mass_kg": 0.5,
+      "_mass": "Team 2026-11-15: up to 500 ml in flight. Override per run: gen_model.py --load water=0 (empty) or =0.25 etc.",
+      "fill_height_fraction": 0.5,
+      "_fill": "Team: approximate the water as filling the bottom half of the module's box. That block (96 x 186 x 47.5 mm) holds ~848 ml, more than 500 ml, so the 500 g is spread over it (centre of mass and inertia approximate). Rigidly attached for now; sloshing is not modelled yet."
+    }
+  ],
 
   "aero": {
     "_comment": "Blade-element constants for Gazebo's LiftDrag system; gen_model.py sizes blade area and drag to hit thrust_coeff and torque_coeff.",

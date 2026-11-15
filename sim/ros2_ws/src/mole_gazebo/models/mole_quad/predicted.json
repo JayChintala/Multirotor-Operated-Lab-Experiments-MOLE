@@ -1,0 +1,10 @@
+{
+  "_comment": "Written by gen_model.py; read by smoke_test.py",
+  "total_mass_kg": 3.234,
+  "hover_cmd": 0.4332,
+  "payloads": [
+    "water_module",
+    "water 500 g"
+  ],
+  "lowest_point_z_m": -0.1055
+}

@@ -1,0 +1,7 @@
+# Changes PLANNED for the real flight controller but not yet on it (log 00016 has the old values).
+# Loaded after mole_quad.parm. Once a change is on the real FC, re-run extract_params.py on a new
+# log and remove it from this file.
+#
+# Current limit (team 2026-11-15): cap each motor at the bench test's top point,
+# 2.0 kgf / 34.5 A per motor (DShot 1500), to prevent motor/ESC burnout. Real FC: 0.95.
+MOT_SPIN_MAX     0.73

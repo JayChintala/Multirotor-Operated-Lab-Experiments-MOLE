@@ -65,20 +65,42 @@ Connect **QGroundControl** with a TCP link to `127.0.0.1:5762`, or MAVProxy with
 
 ```bash
 PY=~/mole_sim/venv-ardupilot/bin/python      # any Python with pymavlink + Gazebo bindings
-$PY src/mole_gazebo/scripts/smoke_test.py --rate-gain-scale 0.5
+$PY src/mole_gazebo/scripts/smoke_test.py --rate-gain-scale 0.6
 ```
 
 1. Motor test A–D: each spins the correct propeller in the correct direction.
 2. AltHold take-off, roll/pitch steady in hover, altitude hold at mid-stick, hover throttle vs
-   the real drone's 0.35.
-3. Yaw right turns right. 4. Land and auto-disarm.
+   the model's prediction (`models/mole_quad/predicted.json`; 0.354 without payload, which
+   matches the real FC's `MOT_THST_HOVER` 0.35).
+3. Yaw right turns right. 4. Land and auto-disarm; fails if ArduPilot's crash detector fires.
 
-Results on 2026-11-08 (motor capped at the measured 2.0 kgf): **11/11 with
-`--rate-gain-scale 0.5`** (roll/pitch rate 0.3 °/s RMS, altitude held within 3 cm, hover output
-0.353). **With the real FC's gains the roll/pitch steadiness check fails** (62 °/s RMS). See below.
-The no-GPS configuration (`gps:=false mavros:=false`) also passed every check with halved gains.
+## Current configuration (2026-11-15): water module + `MOT_SPIN_MAX` 0.73
 
-## Finding: the real FC's roll/pitch tune oscillates in simulation
+- **Water module** (482 g, from `ROS/water_module.urdf` on branch `manan`) fitted centred under
+  the frame, long side across the drone. Total 2.734 kg, CoG 20 mm above the frame centre,
+  predicted hover output 0.394.
+- **Motors modelled as the real hardware** (no current limit, up to ~3.8 kgf / ~60 A
+  extrapolated). The planned firmware limit `MOT_SPIN_MAX` 0.73 (2.0 kgf / 34.5 A per motor) is in
+  `config/planned_changes.parm`; SITL enforces it like the real FC would.
+
+Results (roll/pitch rate RMS in hover, real FC gains × multiplier):
+
+| Configuration | ×0.6 | ×1.0 | ×1.1 | ×1.25 | ×1.5 |
+|---|---|---|---|---|---|
+| Module + `MOT_SPIN_MAX` 0.73 (planned) | **0.2 °/s, 11/11** | 0.2 °/s | 0.5 °/s | 71 °/s oscillates | 70 °/s oscillates |
+| Module + `MOT_SPIN_MAX` 0.95 (FC today) | | 70 °/s oscillates | | | |
+
+- The **current limit is what stabilises the real gains**: it compresses the motor output range
+  to ~0.73×, which lowers the effective loop gain. The module's extra inertia alone does not.
+- With the planned setup the real gains sit close to the oscillation boundary (×1.1 steady,
+  ×1.25 not). **Suggested gains: ×0.6** (`config/suggested_gains_water_module.parm`), about 2×
+  margin, because the model is not yet calibrated against a real flight.
+- **Landing on the module tips the drone over easily**: the model has no landing gear, so it
+  rests on the module's 96 mm-wide base with the CoG ~126 mm above it; one simulated landing
+  tripped ArduPilot's crash detector. If the real drone has no legs with the module fitted, it
+  will have the same problem. Add the real landing gear to `vehicle.json` once known.
+
+## Earlier finding (2026-11-08, no payload): the real FC's roll/pitch tune oscillates
 
 With the real FC's rate gains (`ATC_RAT_RLL/PIT_P` 0.135, `_I` 0.135, `_D` 0.0036: the
 ArduPilot defaults) the simulated drone's roll rate loop oscillates in hover (roll rate 62 °/s
@@ -119,8 +141,10 @@ All numbers are in [`config/vehicle.json`](ros2_ws/src/mole_gazebo/config/vehicl
 | Motor layout | 280 mm front–back × 368 mm side–side | EMSD CAD; front = CAD −y (team) |
 | Thrust, torque | T = 6.983e-6 ω², Q = 1.019e-7 ω² | `ROS/EMSD/motor_data.xlsx`, R² = 0.999 |
 | Motor speed vs output | ω = 2214 (cmd + 0.048) rad/s | DC-motor fit of the same data, ±3 % thrust from hover to full |
-| Maximum per motor | 2.0 kgf (19.7 N), ~16,000 rpm, 34.5 A | bench top point (DShot 1500, ~73 % output); team: ~2 kg at ~35 A is the real limit. Modelled as a motor torque cap (0.289 N·m), so outputs above ~0.73 add no thrust |
-| Thrust/weight | 3.6 | 4 × 2.0 kgf / 2.25 kg |
+| Maximum per motor | ~3.8 kgf, ~22,000 rpm, ~60 A at full output (extrapolated); 2.0 kgf / 34.5 A measured at DShot 1500 | bench data + DC-motor model; team: motors can draw ~60 A. Limited in firmware with `MOT_SPIN_MAX` 0.73 (planned), not in the model (`max_torque_nm: null`) |
+| Water module | 482 g, under the frame, 96 × 186 × 95 mm equivalent box | `config/payloads/water_module.urdf` (branch `manan`); mount position from the team; top-face height **assumed** |
+| Total with module | 2.734 kg, CoG 20 mm above frame centre, hover output 0.394 | |
+| Thrust/weight with module | 2.9 at `MOT_SPIN_MAX` 0.73; ~5.6 unlimited | |
 | Hover | ~8,500 rpm, output 0.354 | matches real `MOT_THST_HOVER` 0.35 |
 | Motor lag | 0.02 s | **assumed** |
 | Spin, output channels | FR/RL CCW, FL/RR CW; SERVO1..4 = motors 4,1,2,3 | `companion/README.md`; FC log 00016 |
@@ -133,10 +157,13 @@ sized so thrust and reaction torque follow the measured curves.
 | File | Contents |
 |---|---|
 | `config/mole_quad.parm` | 337 flight parameters from the real FC (tuning, filters, mixing, failsafes, EKF). **Generated**: re-run after retuning |
+| `config/planned_changes.parm` | changes planned for the real FC but not yet on it: `MOT_SPIN_MAX` 0.73 |
 | `config/sitl_overrides.parm` | sim-only: level IMU (real FC is mounted roll-180), no output when disarmed, file logging, 6S battery |
 | `config/sitl_gps.parm`, `sitl_nogps.parm` | the `gps:=` variants |
+| `config/suggested_gains_water_module.parm` | suggested roll/pitch rate gains with the module (not loaded automatically) |
 
-Load order: ArduPilot's stock `copter.parm` → `mole_quad.parm` → `sitl_overrides.parm` → GPS variant.
+Load order: ArduPilot's stock `copter.parm` → `mole_quad.parm` → `planned_changes.parm` →
+`sitl_overrides.parm` → GPS variant.
 
 After a real flight with new parameters, refresh the sim from its log:
 
@@ -150,8 +177,9 @@ $PY src/mole_gazebo/scripts/extract_params.py path/to/new_log.bin src/mole_gazeb
   vibration are not modelled. Body aerodynamic drag is not modelled.
 - Motor speed is linear in output (ArduPilotPlugin limitation); thrust error ≤ 3 % over 0.15–0.95,
   larger near zero.
-- Above ~73 % output the real motor is assumed current-limited at 2.0 kgf (torque cap); how
-  the real ESC behaves there (current limiting vs more thrust at higher current) is not measured.
+- Thrust above ~73 % output (DShot 1500) is extrapolated from the bench data.
+- The water module is a box with the right mass properties (its meshes are not on GitHub); its
+  top-face height is assumed. No landing gear is modelled.
 - Inertia comes from CAD with assumed component placement.
 - The world is an open field; an indoor cage world needs the cage's dimensions.
 
