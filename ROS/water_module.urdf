@@ -1,0 +1,499 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="emsd_water_module">
+  <!--STEP solid mass properties; uniform effective density normalized to measured total mass. All joints fixed. See config/water_module.json.-->
+  <link name="water_module_base_link">
+    <inertial>
+      <origin xyz="8.69864012765e-09 5.51361796497e-08 -0.00879668555362" rpy="0 0 0" />
+      <mass value="0.129855578995" />
+      <inertia ixx="0.000416098948482" iyy="0.000108185955363" izz="0.000517181277167" ixy="-4.0819396187e-05" ixz="1.75608438389e-11" iyz="1.11503394249e-10" />
+    </inertial>
+    <visual name="water_module_part_00_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_00.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_00_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_00.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="water_module_part_01">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.0691460569686" />
+      <inertia ixx="0.000307461924517" iyy="0.000123749327177" izz="0.000424600541183" ixy="8.23361496486e-13" ixz="8.84177970659e-13" iyz="2.30916040303e-07" />
+    </inertial>
+    <visual name="water_module_part_01_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_01.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_01_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_01.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_01_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_01" />
+    <origin xyz="1.096641708e-09 0.000310987921929 0.00546488124299" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_02">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.0158723015372" />
+      <inertia ixx="1.9305360739e-06" iyy="2.22416437705e-06" izz="3.94686068766e-06" ixy="-2.39313248458e-17" ixz="2.07616636227e-08" iyz="2.17005898677e-15" />
+    </inertial>
+    <visual name="water_module_part_02_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_02.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_02_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_02.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_02_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_02" />
+    <origin xyz="0.000396403559112 2.93514060279e-10 0.034260734019" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_03">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.12745644764" />
+      <inertia ixx="0.000355212603471" iyy="0.000113607928647" izz="0.000466555344954" ixy="-2.51085585374e-07" ixz="5.47306912348e-08" iyz="-7.44825160144e-08" />
+    </inertial>
+    <visual name="water_module_part_03_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_03.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_03_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_03.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_03_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_03" />
+    <origin xyz="4.92947630136e-05 -6.69315740032e-05 0.0257015934072" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_04">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.00986432316626" />
+      <inertia ixx="5.86861901245e-07" iyy="6.75324886413e-07" izz="1.02662036975e-06" ixy="-4.23337057359e-08" ixz="1.49056207619e-10" iyz="4.27268259102e-11" />
+    </inertial>
+    <visual name="water_module_part_04_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_04.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_04_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_04.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_04_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_04" />
+    <origin xyz="-0.019313736511 -0.0824426999074 -0.0204848145722" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_05">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="6.24779755801e-06" />
+      <inertia ixx="1.02613209374e-12" iyy="1.73932826149e-11" izz="1.76384398894e-11" ixy="1.14108490097e-12" ixz="0" iyz="1.78458798254e-20" />
+    </inertial>
+    <visual name="water_module_part_05_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_05.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_05_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_05.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_05_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_05" />
+    <origin xyz="-0.0302869834497 -0.0717800382411 -0.0205" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_06">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="6.24779755801e-06" />
+      <inertia ixx="1.02613195098e-12" iyy="1.73932826149e-11" izz="1.76384396038e-11" ixy="1.14108490097e-12" ixz="0" iyz="1.78458798254e-20" />
+    </inertial>
+    <visual name="water_module_part_06_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_06.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_06_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_06.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_06_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_06" />
+    <origin xyz="-0.0302869834497 -0.0717800382411 -0.0215" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_07">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="6.24779755801e-06" />
+      <inertia ixx="1.02613195098e-12" iyy="1.73932837571e-11" izz="1.76384404604e-11" ixy="1.14108479389e-12" ixz="0" iyz="1.78458798254e-20" />
+    </inertial>
+    <visual name="water_module_part_07_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_07.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_07_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_07.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_07_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_07" />
+    <origin xyz="-0.0302869834497 -0.0717800382411 -0.0195" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_08">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.000150543920801" />
+      <inertia ixx="4.7241527642e-10" iyy="1.06244394889e-09" izz="1.0624439763e-09" ixy="4.5685452353e-18" ixz="-1.82741809412e-17" iyz="-1.71320446324e-18" />
+    </inertial>
+    <visual name="water_module_part_08_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_08.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_08_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_08.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_08_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_08" />
+    <origin xyz="-0.00529248879651 -0.0772 -0.0205" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_09">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.00986432316627" />
+      <inertia ixx="5.86862433682e-07" iyy="6.75324870039e-07" izz="1.02662063232e-06" ixy="-4.23338611395e-08" ixz="-1.49051821816e-10" iyz="-4.27212340109e-11" />
+    </inertial>
+    <visual name="water_module_part_09_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_09.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_09_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_09.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_09_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_09" />
+    <origin xyz="0.019313736511 0.0824426999076 -0.0204848145722" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_10">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="6.24779755801e-06" />
+      <inertia ixx="1.02620490493e-12" iyy="1.7393283186e-11" izz="1.7638495283e-11" ixy="1.14105813215e-12" ixz="-1.14213630882e-18" iyz="0" />
+    </inertial>
+    <visual name="water_module_part_10_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_10.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_10_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_10.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_10_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_10" />
+    <origin xyz="0.0302869834497 0.0717800382412 -0.0205" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_11">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="6.24779755801e-06" />
+      <inertia ixx="1.02616835657e-12" iyy="1.73932923231e-11" izz="1.76385318313e-11" ixy="1.14105813215e-12" ixz="1.14213630882e-18" iyz="4.5685452353e-18" />
+    </inertial>
+    <visual name="water_module_part_11_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_11.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_11_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_11.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_11_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_11" />
+    <origin xyz="0.0302869834497 0.0717800382412 -0.0215" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_12">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="6.24779755801e-06" />
+      <inertia ixx="1.02616835657e-12" iyy="1.73932923231e-11" izz="1.76385318313e-11" ixy="1.14107640633e-12" ixz="1.14213630882e-18" iyz="0" />
+    </inertial>
+    <visual name="water_module_part_12_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_12.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_12_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_12.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_12_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_12" />
+    <origin xyz="0.0302869834497 0.0717800382412 -0.0195" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_13">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.000150543920801" />
+      <inertia ixx="4.72420032275e-10" iyy="1.06244260574e-09" izz="1.0624456758e-09" ixy="1.16954758024e-15" ixz="-9.13709047059e-17" iyz="-3.65483618824e-17" />
+    </inertial>
+    <visual name="water_module_part_13_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_13.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_13_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_13.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_13_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_13" />
+    <origin xyz="0.00529248879644 0.0772 -0.0205" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_14">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.0484234794239" />
+      <inertia ixx="2.7562467716e-05" iyy="2.76779936425e-05" izz="2.98048327212e-05" ixy="7.97322764011e-07" ixz="5.32507176576e-09" iyz="-7.69693297124e-10" />
+    </inertial>
+    <visual name="water_module_part_14_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_14.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_14_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_14.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_14_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_14" />
+    <origin xyz="0.000821119335794 0.0333363786612 -0.0416669092939" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_15">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.0484234794239" />
+      <inertia ixx="2.7672528356e-05" iyy="2.75679334516e-05" izz="2.98048331329e-05" ixy="7.97699601598e-07" ixz="5.25957710127e-09" iyz="-1.13397462104e-09" />
+    </inertial>
+    <visual name="water_module_part_15_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_15.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_15_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_15.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_15_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_15" />
+    <origin xyz="-0.000715384157014 -0.0333782027622 -0.0416669092939" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_16">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.00215892967533" />
+      <inertia ixx="5.70031212476e-07" iyy="4.43897480144e-08" izz="5.31504818162e-07" ixy="2.08575945912e-09" ixz="1.03040504268e-10" iyz="-9.31000305128e-08" />
+    </inertial>
+    <visual name="water_module_part_16_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_16.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_16_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_16.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_16_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_16" />
+    <origin xyz="0.0023104097487 0.0528809877609 -0.0236933317919" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_17">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.00215892967533" />
+      <inertia ixx="5.70031193105e-07" iyy="6.51449662581e-08" izz="5.10749613368e-07" ixy="2.06788891828e-09" ixz="-2.91254188228e-10" iyz="1.35451148071e-07" />
+    </inertial>
+    <visual name="water_module_part_17_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_17.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_17_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_17.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_17_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_17" />
+    <origin xyz="-0.00233540974871 -0.053269453977 -0.0258796553102" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_18">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.00921878785047" />
+      <inertia ixx="9.94789851117e-07" iyy="9.94789846439e-07" izz="9.9478986983e-07" ixy="9.35638064189e-15" ixz="0" iyz="0" />
+    </inertial>
+    <visual name="water_module_part_18_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_18.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_18_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_18.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_18_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_18" />
+    <origin xyz="0.000817807201334 0.0333346162124 -0.0480672635552" rpy="0 0 0" />
+  </joint>
+  <link name="water_module_part_19">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.00921878785047" />
+      <inertia ixx="9.94789851117e-07" iyy="9.94789851117e-07" izz="9.94789851117e-07" ixy="0" ixz="0" iyz="2.33909516047e-15" />
+    </inertial>
+    <visual name="water_module_part_19_visual">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_19.stl" scale="1 1 1" />
+      </geometry>
+      <material name="water_module_gray">
+        <color rgba="0.65 0.68 0.72 1" />
+      </material>
+    </visual>
+    <collision name="water_module_part_19_collision">
+      <geometry>
+        <mesh filename="package://emsd_drone_description/meshes/water_module/water_module_part_19.stl" scale="1 1 1" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="water_module_part_19_mount" type="fixed">
+    <parent link="water_module_base_link" />
+    <child link="water_module_part_19" />
+    <origin xyz="-0.000718809758932 -0.0333797330275 -0.0480672635552" rpy="0 0 0" />
+  </joint>
+</robot>
