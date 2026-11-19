@@ -97,3 +97,7 @@ button { font: inherit; }
   .imu-section { padding-left: 8px; padding-right: 8px; }
   .telemetry-content, .controls-content { padding: 8px; }
 }
+
+.kill-button { margin: 12px; padding: 16px; background: #ba202c; color: white; border: 2px solid #ff7d86; border-radius: 6px; font-weight: 800; cursor: pointer; }
+.kill-button:disabled { opacity: .45; cursor: not-allowed; }
+.kill-status { padding: 0 12px 12px; font-size: 12px; }

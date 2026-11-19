@@ -16,6 +16,7 @@ import sys
 import time
 
 from pymavlink import mavutil
+from signal_trace import SignalReporter, trace_connection
 
 CONN = "tcp:127.0.0.1:5760"
 HEARTBEAT_TIMEOUT = 10  # s
@@ -64,6 +65,10 @@ def main():
     m = mavutil.mavlink_connection(CONN, source_system=MY_SYSID,
                                    source_component=mav.MAV_COMP_ID_ONBOARD_COMPUTER,
                                    retries=2)
+    reporter = SignalReporter('telemetry_bridge', args.laptop_ip, args.laptop_port).start()
+    import atexit
+    atexit.register(reporter.close)
+    trace_connection(m, reporter)
     hb = wait_autopilot(m)
     if hb is None:
         print("No heartbeat from the flight controller; run check_link.py.")
@@ -85,6 +90,7 @@ def main():
           "motors": [{} for _ in range(MOTORS)]}
     period = 1.0 / args.rate
     next_send = next_heartbeat = time.time()
+    last_rpm = 0.0
     sent = 0
     while True:
         msg = m.recv_match(blocking=True, timeout=period)
@@ -112,6 +118,7 @@ def main():
                     pwm = getattr(msg, "servo%d_raw" % (i + 1))
                     motor["output"] = round(min(max((pwm - PWM_MIN) / (PWM_MAX - PWM_MIN), 0), 1) * 100, 1)
             elif t == "ESC_TELEMETRY_1_TO_4":
+                last_rpm = time.monotonic()
                 for motor, rpm, temp in zip(fc["motors"], msg.rpm, msg.temperature):
                     motor["rpm"] = rpm
                     motor["temperature"] = temp
@@ -123,6 +130,11 @@ def main():
             m.mav.heartbeat_send(mav.MAV_TYPE_ONBOARD_CONTROLLER, mav.MAV_AUTOPILOT_INVALID, 0, 0, 0)
             next_heartbeat = now + 1
         if now >= next_send:
+            rpm_age = time.monotonic() - last_rpm if last_rpm else None
+            for motor in fc["motors"]:
+                motor["rpm_age_ms"] = int(rpm_age * 1000) if rpm_age is not None else None
+                if rpm_age is None or rpm_age > 1.0:
+                    motor["rpm"] = None
             packet = {"version": 1, "type": "TELEMETRY", "time_ms": int(now * 1000), "fc": fc}
             sock.sendto(json.dumps(packet, separators=(",", ":")).encode(), dest)
             sent += 1

@@ -16,6 +16,25 @@ import sys
 import time
 
 from pymavlink import mavutil
+from signal_trace import SignalReporter, trace_connection
+from manual_kill_switch import DEFAULT_KILL_FILE, bench_command_lock
+
+
+class BenchKilled(Exception):
+    pass
+
+
+def check_kill():
+    if DEFAULT_KILL_FILE.exists():
+        raise BenchKilled('KILL is latched; no more motors will be started')
+
+
+def wait_or_kill(seconds):
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        check_kill()
+        time.sleep(min(0.02, max(0, deadline - time.monotonic())))
+    check_kill()
 
 CONN = "tcp:127.0.0.1:5760"
 MY_SYSID = 254           # avoid clashing with a laptop GCS (usually 255)
@@ -37,6 +56,8 @@ def parse_args():
                    help="throttle percent (default 7, max %d)" % MAX_THROTTLE)
     p.add_argument("-d", "--duration", type=float, default=2,
                    help="seconds per motor (default 2, max %d)" % MAX_DURATION)
+    p.add_argument("--signal-ip", help="laptop IP for live signal monitor")
+    p.add_argument("--signal-port", type=int, default=5001)
     a = p.parse_args()
     if not 0 < a.throttle <= MAX_THROTTLE:
         p.error("throttle must be between 0 and %d %%" % MAX_THROTTLE)
@@ -90,16 +111,19 @@ def print_statustext(m):
 
 def motor_test(m, motor, throttle, duration):
     """Start one motor and return the FC's MAV_RESULT, or None if no ACK."""
-    m.mav.command_long_send(m.target_system, m.target_component,
-                            mav.MAV_CMD_DO_MOTOR_TEST, 0,
-                            motor,                            # motor (test order)
-                            mav.MOTOR_TEST_THROTTLE_PERCENT,  # throttle type
-                            throttle,                         # throttle %
-                            duration,                         # timeout s
-                            0, 0, 0)                          # one motor, default order
+    with bench_command_lock(DEFAULT_KILL_FILE):
+        check_kill()
+        m.mav.command_long_send(m.target_system, m.target_component,
+                                mav.MAV_CMD_DO_MOTOR_TEST, 0,
+                                motor,                            # motor (test order)
+                                mav.MOTOR_TEST_THROTTLE_PERCENT,  # throttle type
+                                throttle,                         # throttle %
+                                duration,                         # timeout s
+                                0, 0, 0)                          # one motor, default order
     # Wait for the ACK, echoing any STATUSTEXT (refusal reasons) along the way
     deadline = time.time() + 3
     while time.time() < deadline:
+        check_kill()
         ack = m.recv_match(type=["COMMAND_ACK", "STATUSTEXT"], blocking=True, timeout=0.5)
         if ack is None:
             continue
@@ -119,11 +143,21 @@ def stop_motor(m, motor):
 
 def main():
     a = parse_args() # Gathers CLI Args 
+    try:
+        check_kill()
+    except BenchKilled as error:
+        print(error)
+        return 1
     print("Motor test: motors %s at %g %% for %g s each." % (a.motor, a.throttle, a.duration))
 
     # Connect as an onboard computer so we don't look like a second GCS
     m = mavutil.mavlink_connection(CONN, source_system=MY_SYSID,
                                    source_component=mav.MAV_COMP_ID_ONBOARD_COMPUTER)
+    reporter = SignalReporter('motor_test', a.signal_ip, a.signal_port).start() if a.signal_ip else None
+    if reporter:
+        import atexit
+        atexit.register(reporter.close)
+        trace_connection(m, reporter)
     hb = wait_autopilot(m)
     if hb is None:
         print("No heartbeat from the flight controller. Run check_link.py for a checklist.")
@@ -156,10 +190,10 @@ def main():
                       " vehicle not landed, ESC/motor outputs not configured." % name)
                 return 1  # stop on the first failure; don't try the remaining motors
 
-            time.sleep(a.duration + 1)  # FC stops the motor after the timeout; +1 s margin
+            wait_or_kill(a.duration + 1)
             current = None  # motor has stopped, nothing for Ctrl+C to stop
     
-    except KeyboardInterrupt:  # Ctrl+C stop 
+    except (KeyboardInterrupt, BenchKilled):
         if current is not None:
             stop_motor(m, current)
             print("\nStopped motor %d." % current)
