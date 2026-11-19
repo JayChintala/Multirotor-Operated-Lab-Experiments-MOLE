@@ -1,4 +1,5 @@
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 """WebSocket control center bridge for a Raspberry Pi 3B.
 
 The browser connects to port 5173. Control and trigger messages are forwarded
@@ -407,6 +408,8 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 =======
+=======
+>>>>>>> Stashed changes
 """WebSocket control center bridge for a Raspberry Pi 3B.
 
 The browser connects to port 5173. Control and trigger messages are forwarded
@@ -883,4 +886,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
