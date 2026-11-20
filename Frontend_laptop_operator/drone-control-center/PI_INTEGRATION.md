@@ -285,7 +285,7 @@ nothing about the Pi, FC, Pico, valves or camera.
    right `--pi-ip`.
 4. Start `telemetry_bridge.py` on the Pi and confirm real telemetry appears.
 5. Start a kill receiver on the Pi and confirm `KILL_STATUS` shows in the UI
-   (see `companion/MANUAL_KILL_BENCH.md`).
+   (see `companion/BENCH_KILL.md`).
 6. Implement the Pi UDP 5000 receiver. Send neutral `CONTROL` packets and
    confirm the Pi sees consecutive `seq` values.
 7. Connect the Pico and test safe output values.
