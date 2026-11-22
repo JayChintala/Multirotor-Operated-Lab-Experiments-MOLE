@@ -5,12 +5,15 @@
     $PY smoke_test.py                          # all checks with the real FC's tune
     $PY smoke_test.py --rate-gain-scale 0.5    # same, roll/pitch rate gains halved for this run
     $PY smoke_test.py --motors                 # motor order/spin only
+    $PY smoke_test.py --mocap --rate-gain-scale 0.6   # with sitl.launch.py mocap:=true
 
 1. Motor test (disarmed): ArduPilot's motor test A-D must spin the right
    propeller in the right direction (ArduPilot Quad X; companion/README.md).
 2. AltHold flight via RC override (how the real drone is flown, no GPS needed):
    climb, roll/pitch steady, hold altitude at mid-stick, hover throttle vs the real 0.35.
 3. Yaw right: heading must increase. 4. Land and auto-disarm.
+--mocap replaces 2-4 with a Loiter flight on the simulated Vicon: EKF position and yaw vs
+Gazebo ground truth (catches frame mistakes), position hold, stop after a stick input, Land.
 Exit code 0 when every check passes.
 
 With the real FC's roll/pitch gains (log 00016) the steadiness check FAILS:
@@ -60,6 +63,29 @@ class Joints:
             self.vel[j.name.replace('_joint', '')] = j.axis1.velocity
 
 
+class Truth:
+    """Ground-truth pose from Gazebo's OdometryPublisher (world ENU, body FLU)."""
+
+    def __init__(self):
+        from gz.msgs10.odometry_pb2 import Odometry
+        from gz.transport13 import Node
+        self.pose, self.node = None, Node()
+        topic = f'/model/{MODEL}/odometry'
+        if not self.node.subscribe(Odometry, topic, self._cb):
+            raise RuntimeError(f'cannot subscribe to {topic}')
+
+    def _cb(self, msg):
+        self.pose = msg.pose
+
+    def enu(self):
+        p = self.pose.position
+        return p.x, p.y, p.z
+
+    def yaw_enu(self):
+        q = self.pose.orientation
+        return math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
+
+
 class Vehicle:
     def __init__(self, url):
         self.m = mavutil.mavlink_connection(url, source_system=255)
@@ -77,7 +103,9 @@ class Vehicle:
         self.texts = []                   # STATUSTEXT messages from the FC
         # This link gets no telemetry until asked: request what the checks read, at 10 Hz.
         for msg_id in (mavutil.mavlink.MAVLINK_MSG_ID_SERVO_OUTPUT_RAW, mavutil.mavlink.MAVLINK_MSG_ID_VFR_HUD,
-                       mavutil.mavlink.MAVLINK_MSG_ID_GLOBAL_POSITION_INT, mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE):
+                       mavutil.mavlink.MAVLINK_MSG_ID_GLOBAL_POSITION_INT, mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE,
+                       mavutil.mavlink.MAVLINK_MSG_ID_LOCAL_POSITION_NED,
+                       mavutil.mavlink.MAVLINK_MSG_ID_EKF_STATUS_REPORT):
             self.command(mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, msg_id, 100_000)
         threading.Thread(target=self._loop, daemon=True).start()
 
@@ -224,10 +252,91 @@ def flight(v):
           f'crash detector fired: {crashed[0]}' if crashed else f'height {height():.2f} m')
 
 
+def set_mode_and_arm(v, mode):
+    v.m.set_mode(mode)
+    if not v.wait(lambda: v.state.get('HEARTBEAT') and mavutil.mode_string_v10(v.state['HEARTBEAT']) == mode, 15):
+        check(f'switch to {mode}', False)
+        return False
+    for _ in range(30):
+        v.command(mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, 1)
+        if v.wait(v.armed, 2):
+            break
+    check(f'arm in {mode}', v.armed())
+    return v.armed()
+
+
+def mocap_flight(v, truth):
+    """Loiter on the simulated Vicon (sitl.launch.py mocap:=true): no GPS, no compass."""
+    print('2. Loiter on simulated Vicon', flush=True)
+    pos_flags = mavutil.mavlink.EKF_POS_HORIZ_ABS | mavutil.mavlink.EKF_POS_VERT_ABS
+    ok = v.wait(lambda: (e := v.state.get('EKF_STATUS_REPORT')) and e.flags & pos_flags == pos_flags, 90)
+    e = v.state.get('EKF_STATUS_REPORT')
+    check('EKF has an absolute position from Vicon (origin set)', ok, f'flags 0x{e.flags:04x}' if e else 'no EKF report')
+    if not ok:
+        return
+
+    def errors():
+        """EKF (NED) minus truth (ENU -> NED: N=y, E=x, D=-z), and yaw error in degrees."""
+        lp, att = v.get('LOCAL_POSITION_NED'), v.get('ATTITUDE')
+        x, y, z = truth.enu()
+        pos = math.dist((lp.x, lp.y, lp.z), (y, x, -z))
+        yaw = math.degrees((att.yaw - (math.pi / 2 - truth.yaw_enu()) + math.pi) % (2 * math.pi) - math.pi)
+        return pos, yaw
+
+    pos_err, yaw_err = errors()
+    check('EKF position matches Gazebo truth (on ground)', pos_err < 0.1, f'{pos_err * 100:.1f} cm')
+    check('EKF yaw matches Gazebo truth (on ground)', abs(yaw_err) < 5, f'{yaw_err:+.1f} deg')
+
+    v.rc = [1500, 1500, 1000, 1500, 0, 0, 0, 0]
+    if not set_mode_and_arm(v, 'LOITER'):
+        return
+    z0 = truth.enu()[2]
+    v.rc[2] = 1750
+    climbed = v.wait(lambda: truth.enu()[2] - z0 > 2.0, 20)
+    v.rc[2] = 1500
+    check('climb above 2 m', climbed, f'height {truth.enu()[2] - z0:.2f} m')
+    time.sleep(4)
+
+    def hold(seconds):
+        """Largest horizontal distance from the start point, and the worst EKF error, over `seconds`."""
+        x0, y0, _ = truth.enu()
+        drift = worst_pos = worst_yaw = 0.0
+        end = time.time() + seconds
+        while time.time() < end:
+            x, y, _ = truth.enu()
+            drift = max(drift, math.hypot(x - x0, y - y0))
+            pe, ye = errors()
+            worst_pos, worst_yaw = max(worst_pos, pe), max(worst_yaw, abs(ye))
+            time.sleep(0.1)
+        return drift, worst_pos, worst_yaw
+
+    drift, pe, ye = hold(8)
+    check('Loiter holds position for 8 s', drift < 0.3, f'drift {drift * 100:.0f} cm')
+    check('EKF tracks truth in flight', pe < 0.15 and ye < 5, f'worst {pe * 100:.1f} cm, {ye:.1f} deg')
+
+    print('3. Pitch forward 2 s, release: must stop and hold', flush=True)
+    v.rc[1] = 1300
+    time.sleep(2)
+    v.rc[1] = 1500
+    time.sleep(4)
+    drift, _, _ = hold(5)
+    check('stops and holds after stick input', drift < 0.3, f'drift {drift * 100:.0f} cm')
+
+    print('4. Land', flush=True)
+    n_texts = len(v.texts)
+    v.m.set_mode('LAND')
+    disarmed = v.wait(lambda: not v.armed(), 60)
+    crashed = [t for t in v.texts[n_texts:] if 'Crash' in t]
+    check('land and auto-disarm', disarmed and not crashed,
+          f'crash detector fired: {crashed[0]}' if crashed else f'height {truth.enu()[2] - z0:.2f} m')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--url', default='tcp:127.0.0.1:5762')
     parser.add_argument('--motors', action='store_true', help='only run the motor test')
+    parser.add_argument('--mocap', action='store_true',
+                        help='Loiter flight on the simulated Vicon (launch with mocap:=true)')
     parser.add_argument('--rate-gain-scale', type=float, default=1.0,
                         help='multiply ATC_RAT_RLL/PIT P, I, D for this run (restored afterwards)')
     args = parser.parse_args()
@@ -244,7 +353,10 @@ def main():
                 param(v, n, val * args.rate_gain_scale)
             print(f'   roll/pitch rate gains x{args.rate_gain_scale} for this run', flush=True)
         try:
-            flight(v)
+            if args.mocap:
+                mocap_flight(v, Truth())
+            else:
+                flight(v)
         finally:
             for n, val in original.items():
                 param(v, n, val)

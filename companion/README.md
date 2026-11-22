@@ -185,6 +185,22 @@ That is, `tcp:mole.local:5760`. With MAVProxy: `mavproxy.py --master=tcp:mole.lo
 
 Several clients can be connected at once; mavlink-router passes MAVLink between all of them and the FC.
 
+## Clock sync with the laptop (chrony)
+
+The Pi has no battery-backed clock, and the MOLE hotspot has no internet, so the Pi's clock
+is wrong after boot. `time_sync.sh` locks it to the ground-station laptop with chrony, so
+laptop (ROS, Vicon), Pi and FC logs line up. MAVROS also sends the laptop's time to the FC.
+
+```bash
+bash companion/time_sync.sh server             # on the laptop, once (serves 10.42.0.0/24)
+bash companion/time_sync.sh client 10.42.0.23  # on the Pi, once: the laptop's address
+bash companion/time_sync.sh status             # either side: offset and selected source
+```
+
+On the hotspot, the laptop's address is assigned by DHCP: `sudo mole-wifi status` shows it.
+If it changes, re-run `client` with the new address. chrony is used instead of `ntpdate`
+because `ntpdate` is deprecated and sets the clock only once.
+
 ## Field Wi-Fi: the MOLE hotspot
 
 With no router around, the Pi can broadcast its own Wi-Fi network for the laptop to join. The Pi has one Wi-Fi radio, so it is either on the home network or running the hotspot, never both. You switch by hand with `mole-wifi`, which `setup.sh` installs to `/usr/local/bin`:
