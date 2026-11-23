@@ -6,13 +6,14 @@ computer for an ArduPilot flight controller (TBS Lucid H7).
 ```
 FC (SERIAL7, 921600) ──UART──> /dev/serial0 ──> mavlink-router ──> TCP :5760
                                                                     ├─ check_link.py / motor_test.py
-                                                                    ├─ kill_switch.py <── UDP 5002 ── laptop control center
+                                                                    ├─ kill_switch.py or manual_kill_switch.py <── UDP 5002 ── laptop control center
+                                                                    ├─ telemetry_bridge.py ── UDP 5001 ──> laptop control center
                                                                     └─ laptop GCS
 ```
 
 ## Quick setup (fresh Pi)
 
-Everything in "Changes made to this Pi" below is automated by `setup.sh`. It is safe to re-run.
+Everything in "As-built reference" below is automated by `setup.sh`. It is safe to re-run.
 
 ```bash
 sudo apt-get install -y git
@@ -44,11 +45,11 @@ TBS Lucid H7 running ArduCopter 4.7.2, with a TBS Lucid 6S 4-in-1 ESC.
 | `SERIAL7_BAUD` | 921 | 921600 baud, matching mavlink-router |
 | `MOT_PWM_TYPE` | 5 | DShot300 (was 6, DShot600, when first set up). **DShot is required for the Lucid 4-in-1 ESC**: with the default 0 (PWM) the FC accepts motor tests but the motors don't spin |
 | `FRAME_CLASS` / `FRAME_TYPE` | 1 / 1 | Quad X |
-| `SERVO1_FUNCTION`–`SERVO4_FUNCTION` | 33–36 | Outputs 1–4 drive motors 1–4 |
+| `SERVO1_FUNCTION`–`SERVO4_FUNCTION` | 36, 33, 34, 35 | Output 1 = motor 4, output 2 = motor 1, output 3 = motor 2, output 4 = motor 3 (from FC log 00016) |
 | `BRD_SAFETY_DEFLT` | 0 | No safety switch |
 | `SERVO_DSHOT_ESC` | 1 | Lets the FC send DShot commands to the ESC (BLHeli32/AM32 type). Without it, `SERVO_BLH_RVMASK` has no effect |
 | `SERVO_BLH_MASK` | 15 | Outputs 1–4 are DShot ESCs managed by the FC |
-| `SERVO_BLH_RVMASK` | 9 | Reverses outputs 1 and 4 (motors 1 and 4), so the motors spin the Quad X directions: front-right and rear-left CCW, front-left and rear-right CW (seen from above). Verified 2026-10-26 with `motor_test.py` |
+| `SERVO_BLH_RVMASK` | 9 | Reverses outputs 1 and 4, which with the mapping above are motors 4 and 3. The resulting spin directions were checked motor by motor with `motor_test.py` and match Quad X: front-right and rear-left CCW, front-left and rear-right CW (seen from above) |
 | `FS_GCS_ENABLE` | 5 | Land if the GCS link is lost. With no RC receiver, the Wi-Fi link to QGC is the only control link |
 | `FS_GCS_TIMEOUT` | 5 | Seconds without a GCS heartbeat before the failsafe triggers |
 | `FS_OPTIONS` | 0 | GCS failsafe applies in every mode. The earlier value, 18, kept flying in Stabilize/AltHold/Loiter and in Auto missions after link loss |
@@ -60,44 +61,30 @@ Bench notes:
 - No RC receiver is connected yet, so the FC reports 0 RC channels.
 - `BATT_LOW_VOLT` is 10.5 V (a 3S value) and the FC reports the battery monitor as unhealthy. Set the battery parameters for 6S before flying.
 
-## Changes made to this Pi
+## As-built reference
 
-### Packages
-- `apt update` and `full-upgrade` were run (already up to date on 2026-10-04).
-- Installed: git, python3-venv, python3-pip, tmux, meson, ninja-build, pkg-config, gcc, g++.
+`setup.sh` is the source of truth; this is what it leaves on the Pi.
 
-### UART
-- `raspi-config nonint do_serial_cons 1` turned off the serial login console.
-  `/boot/firmware/cmdline.txt` has no `console=serial0`.
-- `raspi-config nonint do_serial_hw 0` turned on the UART hardware, which adds `enable_uart=1` to `/boot/firmware/config.txt`.
-- `/boot/firmware/config.txt` has `dtoverlay=disable-bt` under `[all]`. This gives the full PL011 UART (`ttyAMA0`) to GPIO 14/15, so `/dev/serial0 -> ttyAMA0`.
-- `hciuart.service` doesn't exist on trixie, so there was nothing to disable. `bluetooth.service` is still enabled, but has no hardware to use because of the overlay.
-- `serial-getty@ttyAMA0` is disabled and inactive.
-- User `molepi` is in the `dialout` group.
-- Verified after a reboot: `/dev/serial0 -> ttyAMA0`, and no getty is running on it.
-
-### Python
-- Venv at `~/mav` (Python 3.13) with `pymavlink` 2.4.50 and `MAVProxy` 1.8.75.
-- `~/.bashrc` ends with `source ~/mav/bin/activate`, so the venv is active in every login shell.
-
-### mavlink-router
-- Source: `~/src/mavlink-router` (with submodules), commit `2362c62`, version `v4-16-g2362c62`.
-- Built with `meson setup build . --buildtype=release && ninja -C build -j2`, then `sudo ninja -C build install`.
-- Installed files:
-  - `/usr/bin/mavlink-routerd`
-  - `/usr/lib/systemd/system/mavlink-router.service`
-- Config file: `/etc/mavlink-router/main.conf`
-  - UART endpoint `fc`: `/dev/serial0` at 921600
-  - TCP server on port 5760, all interfaces
-- The service is enabled, so it starts at boot. It runs and listens on 5760 even with no FC attached.
+- **Packages:** git, python3-venv, python3-pip, tmux, meson, ninja-build, pkg-config, gcc, g++.
+- **UART:** serial login console off (`raspi-config nonint do_serial_cons 1`), UART hardware on (`enable_uart=1`), and `dtoverlay=disable-bt` in `/boot/firmware/config.txt`, so `/dev/serial0 -> ttyAMA0` on GPIO 14/15. `serial-getty@ttyAMA0` is disabled. The user is in `dialout`.
+- **Python:** venv at `~/mav` with `pymavlink` and `MAVProxy`; `~/.bashrc` activates it.
+- **mavlink-router:** built from source in `~/src/mavlink-router` and installed to `/usr/bin/mavlink-routerd` as the enabled `mavlink-router` service. Config `/etc/mavlink-router/main.conf` (copy in `companion/mavlink-router/main.conf`): UART endpoint `fc` on `/dev/serial0` at 921600, TCP server on port 5760.
+- **Services and tools:** `kill-switch` service (`kill-switch.service` → `kill_switch.py`), and `mole-wifi` in `/usr/local/bin`.
 
 ### Scripts
-- `~/mole/companion/setup.sh`: reproduces this whole setup on a fresh Pi (see Quick setup).
-- `~/mole/companion/check_link.py`: a read-only link check (see below).
-- `~/mole/companion/motor_test.py`: bench motor test, one motor at a time (see below).
-- `~/mole/companion/kill_switch.py`: kill switch watchdog, run by `kill-switch.service` (see Kill switch).
-- `~/mole/companion/README.md`: this file.
-- `~/mole/companion/mavlink-router/main.conf`: copy of `/etc/mavlink-router/main.conf` for reference. After editing, install it with `sudo install -m 644 companion/mavlink-router/main.conf /etc/mavlink-router/` and restart the service.
+
+| File | What it does |
+|---|---|
+| `setup.sh` | Reproduces the whole setup on a fresh Pi (see Quick setup) |
+| `check_link.py` | Read-only link check against mavlink-router (see Checking the link) |
+| `motor_test.py` | Bench motor test, one motor at a time (see Motor test) |
+| `kill_switch.py` | Watchdog kill receiver on UDP 5002, run by `kill-switch.service` (see Kill switch) |
+| `manual_kill_switch.py` | Manual-only bench kill receiver on UDP 5002; KILL latches motor-test cancel + force-disarm until reset (see [BENCH_KILL.md](BENCH_KILL.md)) |
+| `telemetry_bridge.py` | Read-only bridge: FC telemetry (attitude, IMU, position, battery, mode, arming, motor outputs, ESC RPM) to the laptop backend on UDP 5001 |
+| `signal_trace.py` | Shared module that sends best-effort signal records to the laptop's Signal Monitor; never gates control |
+| `test_signal_trace.py` | Unit tests for `signal_trace.py` (`python -m unittest test_signal_trace` from `companion/`) |
+| `mavlink-router/main.conf` | Copy of `/etc/mavlink-router/main.conf`. After editing: `sudo install -m 644 companion/mavlink-router/main.conf /etc/mavlink-router/` and restart the service |
+| `kill-switch.service`, `mole-wifi` | Installed by `setup.sh` |
 
 ## Controlling mavlink-router
 
@@ -155,17 +142,30 @@ python ~/mole/companion/motor_test.py -m 4 -t 10    # only motor 4 (D) at 10 %
 
 ## Kill switch
 
-`kill_switch.py` runs as the `kill-switch` service (installed and enabled by `setup.sh`). It **force-disarms the FC, which stops the props even in flight, so the drone drops**. Only fly where that is safe, such as the padded cage. It disarms when:
+There are two kill receivers. Both listen on UDP 5002 for packets from the laptop backend, so **only one can run at a time**.
 
-- **KILL** is pressed in the control center (the red bar, or Space), or
+| | `kill_switch.py` (watchdog) | `manual_kill_switch.py` (bench) |
+|---|---|---|
+| Started by | `kill-switch` service, at boot | By hand, see [BENCH_KILL.md](BENCH_KILL.md) |
+| Stops on KILL | Yes: force-disarm | Yes: motor-test cancel + force-disarm, latched until reset |
+| Stops on laptop link loss | Yes, if armed and no heartbeat for 1 s | No |
+| Use for | Flying | Props-off bench tests with `motor_test.py` |
+
+To switch to the bench receiver: `sudo systemctl stop kill-switch`. Start it again with `sudo systemctl start kill-switch` before flying.
+
+### Watchdog (`kill_switch.py`)
+
+It **force-disarms the FC, which stops the props even in flight, so the drone drops**. Only fly where that is safe, such as the padded cage. It disarms when:
+
+- **KILL** is pressed in the control center, or
 - **the laptop link drops** while the FC is armed: no heartbeat from the control center backend for 1 s (`--timeout`). The backend sends the heartbeat only while a control center page is open. Closing the page, stopping the backend, the laptop sleeping or the Wi-Fi dropping all stop the props.
 
 It also disarms an FC that is **armed with no control center connected**, so start the backend and open the page before arming.
 
-- The disarm is `MAV_CMD_COMPONENT_ARM_DISARM` with param2 = 21196 (forced), repeated every 0.1 s until the FC reports disarmed. Tested 2026-11-03: the FC accepts it.
+- The disarm is `MAV_CMD_COMPONENT_ARM_DISARM` with param2 = 21196 (forced), repeated every 0.1 s until the FC reports disarmed. The FC accepts it (tested on the bench).
 - It runs on the Pi and talks to the FC through mavlink-router over the UART, so it works with the Wi-Fi down. If the Pi itself fails, the FC's own GCS failsafe (`FS_GCS_ENABLE` = 5) lands after 5 s.
 - QGC flying the drone isn't watched. If only QGC disconnects, the FC's GCS failsafe lands it.
-- The control center's kill bar shows `WATCHDOG LIVE` when the whole chain works. Check it before every arming.
+- The control center shows the kill receiver's status. Check it is fresh before every arming.
 
 ```bash
 sudo systemctl status kill-switch     # running?
@@ -184,6 +184,22 @@ In Mission Planner or QGroundControl, add a TCP link:
 That is, `tcp:mole.local:5760`. With MAVProxy: `mavproxy.py --master=tcp:mole.local:5760`.
 
 Several clients can be connected at once; mavlink-router passes MAVLink between all of them and the FC.
+
+## Clock sync with the laptop (chrony)
+
+The Pi has no battery-backed clock, and the MOLE hotspot has no internet, so the Pi's clock
+is wrong after boot. `time_sync.sh` locks it to the ground-station laptop with chrony, so
+laptop (ROS, Vicon), Pi and FC logs line up. MAVROS also sends the laptop's time to the FC.
+
+```bash
+bash companion/time_sync.sh server             # on the laptop, once (serves 10.42.0.0/24)
+bash companion/time_sync.sh client 10.42.0.23  # on the Pi, once: the laptop's address
+bash companion/time_sync.sh status             # either side: offset and selected source
+```
+
+On the hotspot, the laptop's address is assigned by DHCP: `sudo mole-wifi status` shows it.
+If it changes, re-run `client` with the new address. chrony is used instead of `ntpdate`
+because `ntpdate` is deprecated and sets the clock only once.
 
 ## Field Wi-Fi: the MOLE hotspot
 
@@ -214,10 +230,33 @@ sudo mole-wifi home       # back home: rejoin the saved home Wi-Fi
 
 Tested 2026-10-26: switched home → hotspot (`AP-ENABLED`, 10.42.0.1) → home over SSH, with no hands-on access needed.
 
+## Pre-flight checklist
+
+Before the next real flight. Simulator prerequisites (model, initial tune, gain sweep, parameter file) are in [`ROS/sim`](../ROS/sim/README.md).
+
+**Decide**
+1. **Per-motor current limit (`MOT_SPIN_MAX`)** from the motor and ESC datasheets (continuous ratings). At 0.73 each motor is capped at 2 kgf / 34.5 A.
+2. **RC transmitter and receiver.** Optional for a tethered hover, strongly recommended before free flight, essential before AutoTune. Wi-Fi is currently the only control link.
+
+**Hardware**
+3. **Reduce vibration:** soft-mount the FC, balance props, tighten everything (the crash log had 114 clipping events).
+4. **Props and motors:** correct CW/CCW prop on each motor, no damage, bells spin freely.
+5. **Battery:** fully charged; check the voltage reading against a multimeter (`BATT_VOLT_MULT`). Set the 6S battery parameters.
+
+**FC setup**
+6. **Back up the FC parameters** (Mission Planner: Config → Full Parameter List → Save).
+7. **Load the new parameter file** from the simulator work and reboot.
+8. **Recalibrate accelerometer and level.** Check `AHRS_ORIENTATION` is still 8 (FC mounted upside down).
+9. **Bench checks, props off:** `motor_test.py` for order and spin; tilt by hand and check the horizon in the ground station; confirm the GCS failsafe triggers when Wi-Fi drops; test the kill switch (above).
+
+**First flight**
+10. **Short, low hover:** tethered or in the cage, AltHold, 30–60 s at about 1 m. Be ready to switch to LAND or disarm; stop at the first wobble.
+11. **Analyse the log:** oscillation, vibration, hover throttle; compare with the simulator and calibrate the model.
+
 ## Git
 
 `~/mole` is a clone of [JayChintala/Multirotor-Operated-Lab-Experiments-MOLE](https://github.com/JayChintala/Multirotor-Operated-Lab-Experiments-MOLE). The Pi files live in `companion/`.
 
 - The Pi pushes using a GitHub **deploy key** (`~/.ssh/id_ed25519` on the Pi) with write access to this repo only.
 - Commits are made as `JayChintala` with a GitHub no-reply email (set in the Pi's global git config), so no personal email is published.
-- Run `git pull` and `git push` from `~/mole` on the Pi. From the Mac, run them over SSH: `ssh pi "cd mole && git status"`.
+- Run `git pull` and `git push` from `~/mole` on the Pi.

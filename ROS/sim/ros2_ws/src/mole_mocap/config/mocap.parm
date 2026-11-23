@@ -1,0 +1,23 @@
+# Vicon external navigation for ArduCopter 4.7. The SAME file is loaded by SITL
+# (sitl.launch.py mocap:=true) and is meant for the real FC, so the sim tests the
+# parameters you fly. Load on the real FC with QGC/MAVProxy (param load), then reboot.
+#
+# Pose arrives as VISION_POSITION_ESTIMATE from MAVROS (mole_mocap mocap_bridge).
+VISO_TYPE        1      # MAVLink visual odometry
+VISO_POS_X       0      # Vicon object origin relative to the CoG (m, FRD). Set if the
+VISO_POS_Y       0      #   object origin in Vicon Tracker is not at the CoG.
+VISO_POS_Z       0
+VISO_ORIENT      0      # Vicon object x axis = drone nose
+VISO_DELAY_MS    30     # camera->FC latency. Measure on the real link and update (see README)
+VISO_POS_M_NSE   0.05   # m. Vicon is ~1 mm; this mostly covers Wi-Fi timing jitter
+VISO_YAW_M_NSE   0.05   # rad
+
+# EKF3 source set 1: everything from Vicon (no GPS or compass fitted)
+EK3_SRC1_POSXY   6      # ExternalNav
+EK3_SRC1_VELXY   0      # none: Vicon gives pose only; EKF derives velocity
+EK3_SRC1_POSZ    6      # ExternalNav (baro is disturbed by prop wash / ground effect indoors)
+EK3_SRC1_VELZ    0
+EK3_SRC1_YAW     6      # ExternalNav
+GPS1_TYPE        0      # no GPS module: stop the EKF/arming checks waiting for one
+COMPASS_ENABLE   0
+COMPASS_USE      0
