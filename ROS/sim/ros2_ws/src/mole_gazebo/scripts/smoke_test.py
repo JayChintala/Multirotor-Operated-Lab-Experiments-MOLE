@@ -13,7 +13,16 @@
    climb, roll/pitch steady, hold altitude at mid-stick, hover throttle vs the real 0.35.
 3. Yaw right: heading must increase. 4. Land and auto-disarm.
 --mocap replaces 2-4 with a Loiter flight on the simulated Vicon: EKF position and yaw vs
-Gazebo ground truth (catches frame mistakes), position hold, stop after a stick input, Land.
+Gazebo ground truth (catches frame mistakes), position hold, stop after a stick input, then
+(with lab_limits.parm's fence) full stick at the wall and the ceiling: the fence must stop it.
+The whole flight must stay inside the lab's tracked volume (--volume, default 3 x 3 x 4 m).
+--vicon-loss replaces the fence and Land steps: it stops the simulated Vicon in a hover and
+checks that ArduPilot lands by itself (needs the ROS 2 CLI in this shell).
+--param NAME=VALUE changes FC parameters for this run only, e.g. --param VISO_DELAY_MS=80.
+
+EKF height: when the origin is set, ArduPilot resets its height datum at the drone's resting
+height (the "Field Elevation Set" message), so the EKF reads about that much (~13 cm) above
+Vicon from then on, on the real drone too. Height checks use the on-ground offset.
 Exit code 0 when every check passes.
 
 With the real FC's roll/pitch gains (log 00016) the steadiness check FAILS:
@@ -22,6 +31,7 @@ See sim/README.md. --rate-gain-scale changes the gains only for this run.
 """
 import argparse
 import math
+import subprocess
 import sys
 import threading
 import time
@@ -70,12 +80,21 @@ class Truth:
         from gz.msgs10.odometry_pb2 import Odometry
         from gz.transport13 import Node
         self.pose, self.node = None, Node()
+        self.lo, self.hi = [math.inf] * 3, [-math.inf] * 3   # extent of the flight (world ENU)
         topic = f'/model/{MODEL}/odometry'
         if not self.node.subscribe(Odometry, topic, self._cb):
             raise RuntimeError(f'cannot subscribe to {topic}')
+        end = time.time() + 10               # discovery takes a moment; don't read before the first message
+        while self.pose is None and time.time() < end:
+            time.sleep(0.05)
+        if self.pose is None:
+            raise RuntimeError(f'no messages on {topic} (is the OdometryPublisher in model.sdf?)')
 
     def _cb(self, msg):
         self.pose = msg.pose
+        p = msg.pose.position
+        for i, c in enumerate((p.x, p.y, p.z)):
+            self.lo[i], self.hi[i] = min(self.lo[i], c), max(self.hi[i], c)
 
     def enu(self):
         p = self.pose.position
@@ -172,18 +191,20 @@ RATE_GAINS = [f'ATC_RAT_{axis}_{k}' for axis in ('RLL', 'PIT') for k in ('P', 'I
 
 
 def param(v, name, value=None):
-    """Read a parameter, or set it when value is given. Returns the FC's value."""
-    if value is None:
-        v.m.mav.param_request_read_send(v.m.target_system, v.m.target_component, name.encode(), -1)
-    else:
-        v.m.mav.param_set_send(v.m.target_system, v.m.target_component, name.encode(), float(value),
-                               mavutil.mavlink.MAV_PARAM_TYPE_REAL32)
-    end = time.time() + 3
-    while time.time() < end:
-        p = v.state.get('PARAM_VALUE')
-        if p and p.param_id == name and (value is None or abs(p.param_value - value) < 1e-6):
-            return p.param_value
-        time.sleep(0.05)
+    """Read a parameter, or set it when value is given. Returns the FC's value. Retries: a request
+    sent while the FC is busy streaming is sometimes lost."""
+    for _ in range(3):
+        if value is None:
+            v.m.mav.param_request_read_send(v.m.target_system, v.m.target_component, name.encode(), -1)
+        else:
+            v.m.mav.param_set_send(v.m.target_system, v.m.target_component, name.encode(), float(value),
+                                   mavutil.mavlink.MAV_PARAM_TYPE_REAL32)
+        end = time.time() + 3
+        while time.time() < end:
+            p = v.state.get('PARAM_VALUE')
+            if p and p.param_id == name and (value is None or abs(p.param_value - value) < 1e-4):
+                return p.param_value
+            time.sleep(0.05)
     raise RuntimeError(f'no reply for parameter {name}')
 
 
@@ -265,7 +286,13 @@ def set_mode_and_arm(v, mode):
     return v.armed()
 
 
-def mocap_flight(v, truth):
+def set_vicon_dropout(probability):
+    """Change the simulated Vicon's frame-loss probability live (1.0 = Vicon lost)."""
+    subprocess.run(['ros2', 'param', 'set', '/fake_vicon', 'dropout_probability', str(float(probability))],
+                   check=True, capture_output=True, timeout=30)
+
+
+def mocap_flight(v, truth, volume, vicon_loss=False):
     """Loiter on the simulated Vicon (sitl.launch.py mocap:=true): no GPS, no compass."""
     print('2. Loiter on simulated Vicon', flush=True)
     pos_flags = mavutil.mavlink.EKF_POS_HORIZ_ABS | mavutil.mavlink.EKF_POS_VERT_ABS
@@ -275,16 +302,23 @@ def mocap_flight(v, truth):
     if not ok:
         return
 
-    def errors():
-        """EKF (NED) minus truth (ENU -> NED: N=y, E=x, D=-z), and yaw error in degrees."""
+    def raw_errors():
+        """EKF (NED) minus truth (ENU -> NED: N=y, E=x, D=-z): horizontal, down; yaw error in degrees."""
         lp, att = v.get('LOCAL_POSITION_NED'), v.get('ATTITUDE')
         x, y, z = truth.enu()
-        pos = math.dist((lp.x, lp.y, lp.z), (y, x, -z))
         yaw = math.degrees((att.yaw - (math.pi / 2 - truth.yaw_enu()) + math.pi) % (2 * math.pi) - math.pi)
-        return pos, yaw
+        return math.hypot(lp.x - y, lp.y - x), lp.z + z, yaw
 
-    pos_err, yaw_err = errors()
-    check('EKF position matches Gazebo truth (on ground)', pos_err < 0.1, f'{pos_err * 100:.1f} cm')
+    horiz, dz0, yaw_err = raw_errors()
+
+    def errors():
+        """Position error with the on-ground height-datum offset removed, and yaw error."""
+        h, dz, yaw = raw_errors()
+        return math.hypot(h, dz - dz0), yaw
+
+    check('EKF horizontal position matches Gazebo truth (on ground)', horiz < 0.1, f'{horiz * 100:.1f} cm')
+    check('EKF height offset is the datum reset (< 0.3 m)', abs(dz0) < 0.3,
+          f'EKF {-dz0 * 100:+.1f} cm vs Vicon')
     check('EKF yaw matches Gazebo truth (on ground)', abs(yaw_err) < 5, f'{yaw_err:+.1f} deg')
 
     v.rc = [1500, 1500, 1000, 1500, 0, 0, 0, 0]
@@ -322,13 +356,64 @@ def mocap_flight(v, truth):
     drift, _, _ = hold(5)
     check('stops and holds after stick input', drift < 0.3, f'drift {drift * 100:.0f} cm')
 
-    print('4. Land', flush=True)
+    if vicon_loss:
+        print('4. Vicon lost in a hover: ArduPilot must land by itself', flush=True)
+        n_texts = len(v.texts)
+        x0, y0, _ = truth.enu()
+        t0 = time.time()
+        set_vicon_dropout(1.0)
+        try:
+            landing = v.wait(lambda: mavutil.mode_string_v10(v.state['HEARTBEAT']) == 'LAND', 10)
+            t_land = time.time() - t0
+            check('switches to LAND within 3 s of losing Vicon', landing and t_land < 3,
+                  f'{t_land:.1f} s' if landing else 'still ' + mavutil.mode_string_v10(v.state['HEARTBEAT']))
+            disarmed = v.wait(lambda: not v.armed(), 90)
+            x, y, _ = truth.enu()
+            drift = math.hypot(x - x0, y - y0)
+            crashed = [t for t in v.texts[n_texts:] if 'Crash' in t]
+            check('lands and disarms without Vicon', disarmed and not crashed,
+                  crashed[0] if crashed else f'{time.time() - t0:.0f} s after the loss')
+            check('blind landing drifts < 1 m', drift < 1.0, f'{drift * 100:.0f} cm, ended at ({x:+.2f}, {y:+.2f}) m')
+        finally:
+            set_vicon_dropout(0.0)
+        return
+
+    if param(v, 'FENCE_ENABLE'):
+        alt_max, margin = param(v, 'FENCE_ALT_MAX'), param(v, 'FENCE_MARGIN')
+        print('4. Lab fence: full forward stick, then full throttle; the fence must stop it', flush=True)
+        n_texts = len(v.texts)
+        v.rc[1] = 1000
+        time.sleep(8)
+        v.rc[1] = 1500
+        time.sleep(3)
+        x, y, _ = truth.enu()
+        check('fence stops it before the wall', max(abs(x), abs(y)) < volume[0] / 2,
+              f'at ({x:+.2f}, {y:+.2f}) m, tracked to +-{volume[0] / 2:g} m')
+        v.rc[2] = 2000
+        time.sleep(8)
+        v.rc[2] = 1500
+        time.sleep(2)
+        z = truth.enu()[2] - z0
+        check('fence stops the climb below FENCE_ALT_MAX', z < alt_max,
+              f'{z:.2f} m (FENCE_ALT_MAX {alt_max:g}, margin {margin:g})')
+        breaches = [t for t in v.texts[n_texts:] if 'ence' in t and 'reach' in t]
+        mode = mavutil.mode_string_v10(v.state['HEARTBEAT'])
+        check('no fence breach (avoidance stopped it first), still in LOITER',
+              not breaches and mode == 'LOITER', breaches[0] if breaches else mode)
+
+    print('5. Land', flush=True)
     n_texts = len(v.texts)
     v.m.set_mode('LAND')
     disarmed = v.wait(lambda: not v.armed(), 60)
     crashed = [t for t in v.texts[n_texts:] if 'Crash' in t]
     check('land and auto-disarm', disarmed and not crashed,
           f'crash detector fired: {crashed[0]}' if crashed else f'height {truth.enu()[2] - z0:.2f} m')
+    hx, hy, hz = volume[0] / 2, volume[1] / 2, volume[2]
+    inside = max(abs(truth.lo[0]), abs(truth.hi[0])) <= hx and max(abs(truth.lo[1]), abs(truth.hi[1])) <= hy \
+        and truth.hi[2] <= hz
+    check('whole flight inside the tracked volume', inside,
+          f'x {truth.lo[0]:+.2f}..{truth.hi[0]:+.2f}, y {truth.lo[1]:+.2f}..{truth.hi[1]:+.2f}, '
+          f'z up to {truth.hi[2]:.2f} m (volume +-{hx:g} x +-{hy:g} x {hz:g} m)')
 
 
 def main():
@@ -337,6 +422,12 @@ def main():
     parser.add_argument('--motors', action='store_true', help='only run the motor test')
     parser.add_argument('--mocap', action='store_true',
                         help='Loiter flight on the simulated Vicon (launch with mocap:=true)')
+    parser.add_argument('--volume', default='3.0,3.0,4.0',
+                        help='Vicon tracked volume x,y,z in m, floor centred on the origin (as mocap_volume)')
+    parser.add_argument('--vicon-loss', action='store_true',
+                        help='with --mocap: lose the simulated Vicon in a hover instead of the fence/Land steps')
+    parser.add_argument('--param', action='append', default=[], metavar='NAME=VALUE',
+                        help='set an FC parameter for this run only (repeatable), e.g. VISO_DELAY_MS=80')
     parser.add_argument('--rate-gain-scale', type=float, default=1.0,
                         help='multiply ATC_RAT_RLL/PIT P, I, D for this run (restored afterwards)')
     args = parser.parse_args()
@@ -352,9 +443,15 @@ def main():
             for n, val in original.items():
                 param(v, n, val * args.rate_gain_scale)
             print(f'   roll/pitch rate gains x{args.rate_gain_scale} for this run', flush=True)
+        for item in args.param:
+            name, value = item.split('=')
+            if name not in original:
+                original[name] = param(v, name)
+            param(v, name, float(value))
+            print(f'   {name} = {value} for this run (was {original[name]:g})', flush=True)
         try:
             if args.mocap:
-                mocap_flight(v, Truth())
+                mocap_flight(v, Truth(), [float(c) for c in args.volume.split(',')], args.vicon_loss)
             else:
                 flight(v)
         finally:

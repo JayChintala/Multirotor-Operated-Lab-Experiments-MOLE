@@ -48,8 +48,10 @@ ros2 launch mole_gazebo sitl.launch.py mocap:=true        # no GPS/compass, simu
 |---|---|---|
 | `gps` | `true` | `true`: simulated GPS + compass (Loiter/Guided/Auto/RTL work). `false`: matches the real drone, only Stabilize/AltHold/Acro |
 | `mavros` | `true` | start MAVROS on `tcp:5760` |
-| `mocap` | `false` | `true`: simulated Vicon through MAVROS, real drone's `mocap.parm`, no GPS/compass |
+| `mocap` | `false` | `true`: simulated Vicon lab through MAVROS: `mocap.parm` + `lab_limits.parm`, fence, no GPS/compass |
 | `mocap_latency_ms` / `mocap_dropout` | `20.0` / `0.0` | simulated Vicon delay and frame-loss probability |
+| `mocap_volume` / `mocap_fence` | `3.0,3.0,4.0` / `2.5,2.5` | tracked volume x,y,z and fence x,y in m, centred on the Vicon origin (floor centre) |
+| `spawn_x` / `spawn_y` / `spawn_yaw_deg` | `0` / `0` / `90` | drone start in m east/north of the origin, heading from east (90 = nose north) |
 | `headless` | `false` | Gazebo server only |
 | `wipe` | `true` | start SITL from the parameter files every time (no stale eeprom) |
 | `ardupilot_dir` | `~/mole_sim/ardupilot-4.7.2` | ArduPilot build with `build/sitl/bin/arducopter` |
@@ -96,18 +98,57 @@ Everything ROS runs on the ground-station laptop. The Pi only relays MAVLink (ma
 so the only Wi-Fi hop carries MAVLink, not ROS traffic. The ArduPilot parameters are in
 `src/mole_mocap/config/mocap.parm`; SITL loads that same file.
 
+**The lab volume.** Vicon tracks a 3 × 3 m floor area, origin at its centre, up to 4 m (the
+cage is 8 m high, but the cameras don't see that far). Leaving the volume means losing Vicon,
+and then the EKF failsafe lands wherever the drone is. `src/mole_mocap/config/lab_limits.parm`
+keeps it inside. It is separate from `mocap.parm` and only for lab sessions;
+`outdoor_limits.parm` puts the outdoor values back:
+
+| | Lab | Outdoor |
+|---|---|---|
+| Loiter speed / lean (`LOIT_SPEED_MS`, `LOIT_ANG_MAX`) | 1 m/s, 5° | 12.5 m/s, 2/3 of `ANGLE_MAX` |
+| Climb / descent (`PILOT_SPD_UP/DN`) | 1 / 0.75 m/s | 2.5 / 2.5 m/s |
+| Fence | 2.5 × 2.5 m polygon + 3 m ceiling, stop 0.3 m / 0.5 m inside, breach → Brake | off |
+
+The polygon is uploaded by the `lab_fence` node (started by both launch files) once the EKF
+origin is set. With `lab_limits.parm` loaded, the FC refuses to arm until it is there.
+`LOIT_ANG_MAX` matters most: in 4.7 Loiter feeds the stick's lean angle forward regardless of
+the speed limit and the fence. At the outdoor default, full stick pitched the sim 20°, overshot
+to 1.7 m/s and went 4.5 m through the fence before Vicon was lost.
+
 ### In simulation
 
 ```bash
 ros2 launch mole_gazebo sitl.launch.py mocap:=true            # implies gps:=false
 ros2 launch mole_gazebo sitl.launch.py mocap:=true mocap_latency_ms:=50 mocap_dropout:=0.05
 $PY src/mole_gazebo/scripts/smoke_test.py --mocap --rate-gain-scale 0.6
+$PY src/mole_gazebo/scripts/smoke_test.py --mocap --rate-gain-scale 0.6 --vicon-loss   # lose Vicon in a hover
+$PY src/mole_gazebo/scripts/smoke_test.py --mocap --rate-gain-scale 0.6 --param VISO_DELAY_MS=80
 ```
 
 `fake_vicon` samples Gazebo's true pose at 100 Hz and adds 0.5 mm / 0.002 rad noise, a 20 ms
-delay and optional dropouts. `smoke_test.py --mocap` checks the EKF position and yaw against
-Gazebo's truth, which catches frame-convention mistakes. It then holds position in Loiter,
-moves on a stick input, checks that the drone stops and holds, and lands.
+delay and optional dropouts. It publishes nothing while the drone is outside the tracked
+volume, as the real cameras would. Gazebo shows the volume as a blue box and the fence in red.
+`smoke_test.py --mocap` checks the EKF position and yaw against Gazebo's truth, which catches
+frame-convention mistakes. It then holds position in Loiter, moves on a stick input, checks
+that the drone stops and holds, pushes full stick into the fence and full throttle into the
+ceiling (the fence must stop both without a breach), lands, and checks that the whole flight
+stayed inside the volume.
+
+**EKF height offset.** When the EKF origin is set, ArduPilot sets the barometer's field
+elevation ("Field Elevation Set" in the messages) and resets its height datum at the drone's
+resting height. From then on the reported height (`LOCAL_POSITION_NED`,
+`/mavros/local_position/pose`) reads that much above Vicon: about 13 cm in the sim. It happens on
+the real drone too. Control and the fence are unaffected (both work relative to home); the
+smoke test and `mocap_check` compare against the on-ground offset.
+
+The smoke test reads Gazebo's truth through the gz Python bindings. On a ROS-only install
+they live in the vendor packages:
+
+```bash
+export PYTHONPATH=/opt/ros/jazzy/opt/gz_transport_vendor/lib/python:/opt/ros/jazzy/opt/gz_msgs_vendor/lib/python:$PYTHONPATH
+export LD_LIBRARY_PATH=/opt/ros/jazzy/opt/gz_transport_vendor/lib:/opt/ros/jazzy/opt/gz_msgs_vendor/lib:$LD_LIBRARY_PATH
+```
 
 ### In the lab
 
@@ -124,8 +165,10 @@ colcon build --symlink-install && source install/setup.bash
    Tracker, create an object named `mole`. Put its origin at the CoG, with **x towards the
    nose and z up**. ArduPilot takes that frame as the drone's body. If the origin can't be at
    the CoG, enter the offset in `VISO_POS_X/Y/Z`. Enable DataStream.
-2. **FC parameters.** Load `mocap.parm` (QGC: Parameters → Tools → Load from file, or MAVProxy
-   `param load`) and reboot the FC.
+2. **FC parameters.** Load `mocap.parm` and `lab_limits.parm` (QGC: Parameters → Tools →
+   Load from file, or MAVProxy `param load`) and reboot the FC. Before flying outdoors again,
+   load `outdoor_limits.parm`. Note that `mocap.parm` itself turns GPS and compass off
+   (`GPS1_TYPE 0`, `COMPASS_ENABLE 0`), so it also has to be undone for a GPS flight.
 3. **Clocks.** Run `companion/time_sync.sh` once: `server` on the laptop, `client <laptop-ip>`
    on the Pi (see `companion/README.md`).
 4. **Run:**
@@ -134,8 +177,12 @@ colcon build --symlink-install && source install/setup.bash
    ros2 topic hz /vicon/mole/mole                 # Vicon rate, typically 100+ Hz
    ros2 topic echo /mavros/global_position/gp_origin --once   # FC accepted the origin
    ```
-   Before arming, walk the drone around and check in QGC that its position and heading follow.
-   Fly the first time in AltHold, then switch to Loiter.
+   Before arming, carry the drone through `mocap_check` (props off, disarmed):
+   ```bash
+   ros2 run mole_mocap mocap_check      # nose = Vicon +x, 1 m along +x and +y, lift, turn left
+   ```
+   It catches a swapped axis, a wrong sign or a Vicon object whose x axis isn't the nose, any
+   of which would make Loiter fly away. Fly the first time in AltHold, then switch to Loiter.
 
 **Network:** the laptop needs to reach both the Vicon PC and the Pi at the same time. The Pi
 has a single Wi-Fi radio, so either put the Pi on the lab network (`mole-wifi home`, after
@@ -148,9 +195,14 @@ and compare `VISO` against `XKF1` (or IMU) during a sharp yaw. Set the lag you s
 re-run the sim with the same `mocap_latency_ms`. If Loiter oscillates slowly in position,
 this value is the first thing to check.
 
-**Losing Vicon** (drone leaves the volume or markers are blocked): `mocap_bridge` logs an
-error after 0.5 s. The EKF loses position, and ArduPilot's EKF failsafe switches to Land.
-In position modes, keep the drone well inside the tracked volume.
+**Losing Vicon** (drone leaves the volume, markers blocked, Vicon PC or Ethernet down): after
+0.5 s without a pose while armed, `mocap_bridge` switches the EKF to source set 2 (no horizontal
+position) and commands LAND, so the drone descends level. Without that, the EKF freezes its last
+position and keeps steering on it while the drone drifts: in SITL it drifted 5.6 m before
+ArduPilot's own failsafe landed it, 8 s later. With it: LAND after 1.5 s, 26 cm of drift. Once
+Vicon is back and the drone is disarmed, the bridge switches to source set 1 again. If the Wi-Fi
+drops, nothing reaches the FC; the Pi's kill switch disarms after 1 s. Disable with
+`-p on_loss:=none`.
 
 **Zenoh:** not needed with this layout, because all ROS nodes run on the laptop. If ROS
 nodes are ever split across machines over Wi-Fi, `rmw_zenoh_cpp` (Jazzy) handles that

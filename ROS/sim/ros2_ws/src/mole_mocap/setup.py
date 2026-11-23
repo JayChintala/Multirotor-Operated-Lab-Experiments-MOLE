@@ -22,5 +22,7 @@ setup(
     entry_points={'console_scripts': [
         'mocap_bridge = mole_mocap.mocap_bridge:main',
         'fake_vicon = mole_mocap.fake_vicon:main',
+        'lab_fence = mole_mocap.lab_fence:main',
+        'mocap_check = mole_mocap.mocap_check:main',
     ]},
 )

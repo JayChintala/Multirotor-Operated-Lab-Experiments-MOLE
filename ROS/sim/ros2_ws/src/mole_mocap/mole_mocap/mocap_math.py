@@ -71,3 +71,31 @@ class RateLimiter:
             return False
         self.last = t     # also resyncs if time jumps backwards (sim reset)
         return True
+
+
+# ArduPilot's LOCATION_SCALING_FACTOR (metres per 1e-7 degree of latitude), so a point we place
+# here lands where ArduPilot's own local<->lat/lon conversion puts it.
+_M_PER_DEG = 0.011131884502145034 * 1e7
+
+
+def offset_latlon(lat, lon, north_m, east_m):
+    """lat/lon (deg) of a point north_m/east_m metres from (lat, lon), flat-earth like ArduPilot."""
+    return (lat + north_m / _M_PER_DEG,
+            lon + east_m / (_M_PER_DEG * max(math.cos(math.radians(lat)), 0.01)))
+
+
+def in_volume(position, half_x, half_y, z_max, z_min=-1.0):
+    """True if position (x, y, z in the Vicon frame, origin at the floor centre) is in the box."""
+    x, y, z = position
+    return abs(x) <= half_x and abs(y) <= half_y and z_min <= z <= z_max
+
+
+def yaw_deg(quat):
+    """Heading in degrees (rotation about z, counter-clockwise positive) of an (x, y, z, w) quaternion."""
+    x, y, z, w = quat
+    return math.degrees(math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z)))
+
+
+def wrap_deg(angle):
+    """Wrap to [-180, 180)."""
+    return (angle + 180.0) % 360.0 - 180.0

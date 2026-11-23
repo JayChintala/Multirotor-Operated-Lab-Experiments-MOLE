@@ -1,7 +1,8 @@
 import math
 import random
 
-from mole_mocap.mocap_math import DelayLine, RateLimiter, perturb, pose_ok, quat_from_rotvec, quat_mul
+from mole_mocap.mocap_math import (DelayLine, RateLimiter, in_volume, offset_latlon, perturb, pose_ok,
+                                   quat_from_rotvec, quat_mul, wrap_deg, yaw_deg)
 
 
 def test_quat_mul_composes_yaw():
@@ -52,3 +53,24 @@ def test_rate_limiter_resyncs_after_time_goes_backwards():
     assert r.accept(100.0)
     assert r.accept(1.0)      # sim restarted
     assert not r.accept(1.005)
+
+
+def test_offset_latlon_round_trip_distance():
+    lat0, lon0 = 40.4433, -79.9436
+    lat, lon = offset_latlon(lat0, lon0, 1.25, -1.25)
+    # Back to metres with the same scaling ArduPilot uses.
+    north = (lat - lat0) * 0.011131884502145034 * 1e7
+    east = (lon - lon0) * 0.011131884502145034 * 1e7 * math.cos(math.radians(lat0))
+    assert abs(north - 1.25) < 1e-6 and abs(east + 1.25) < 1e-6
+
+
+def test_in_volume_edges():
+    assert in_volume((1.5, -1.5, 4.0), 1.5, 1.5, 4.0)
+    assert not in_volume((1.51, 0, 1), 1.5, 1.5, 4.0)
+    assert not in_volume((0, 0, 4.2), 1.5, 1.5, 4.0)
+
+
+def test_yaw_deg_and_wrap():
+    assert abs(yaw_deg(quat_from_rotvec((0, 0, math.radians(90)))) - 90) < 1e-9
+    assert abs(yaw_deg(quat_from_rotvec((0, 0, math.radians(-170)))) + 170) < 1e-9
+    assert wrap_deg(190) == -170 and wrap_deg(-190) == 170 and wrap_deg(0) == 0

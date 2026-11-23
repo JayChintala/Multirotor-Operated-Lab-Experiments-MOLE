@@ -1,0 +1,16 @@
+# Undo lab_limits.parm on the real FC before flying outdoors: the values from
+# mole_gazebo/config/mole_quad.parm (the real FC's parameters). Same keys as lab_limits.parm.
+LOIT_SPEED_MS    12.5
+LOIT_ANG_MAX     0
+LOIT_BRK_DELAY   1
+PILOT_SPD_UP     2.5
+PILOT_SPD_DN     0
+LAND_SPD_MS      0.5
+FENCE_ENABLE     0
+FENCE_TYPE       7
+FENCE_ALT_MAX    100
+FENCE_ALT_MAX_TP 1
+FENCE_MARGIN     2
+FENCE_MARGIN_XY  0
+FENCE_ACTION     1
+AVOID_ENABLE     3

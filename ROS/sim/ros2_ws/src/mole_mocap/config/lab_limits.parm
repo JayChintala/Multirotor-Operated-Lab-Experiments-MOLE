@@ -1,0 +1,29 @@
+# Indoor limits for the Vicon lab: 3 x 3 m tracked floor (origin at its centre), 4 m tracked
+# height, inside an 8 m cage. NOT part of mocap.parm, so GPS/outdoor flying is unaffected.
+#
+# SITL loads this with mocap:=true. On the real FC, load it for lab sessions only, and load
+# outdoor_limits.parm before flying outside (FC parameters stay in its memory until changed).
+# The square fence itself is uploaded by the lab_fence node (vicon.launch.py / sitl.launch.py).
+
+# Speeds and lean. In 4.7 Loiter turns the stick into a lean angle and feeds that acceleration
+# forward regardless of LOIT_SPEED_MS and fence avoidance. With LOIT_ANG_MAX 0 (= 2/3 of
+# ANGLE_MAX) full stick pitched the sim 15-20 deg, overshot to 1.7 m/s and went straight through
+# the fence (2026-11-23). 5 deg = 0.86 m/s^2.
+# Outdoor values: 12.5 / 0 / 1 / 2.5 / 0 (= up).
+LOIT_SPEED_MS    1.0
+LOIT_ANG_MAX     5      # deg
+LOIT_BRK_DELAY   0.3    # s of coasting after the stick is released, before braking (outdoor 1 s)
+PILOT_SPD_UP     1.0
+PILOT_SPD_DN     0.75
+LAND_SPD_MS      0.5
+
+# Fence: max altitude (bit 0) + the uploaded polygon (bit 2). No circle: its 30 m minimum
+# radius is useless indoors. The polygon must be on the FC before it will arm.
+FENCE_ENABLE     1
+FENCE_TYPE       5
+FENCE_ALT_MAX    3.0    # m above home (the take-off point). Vicon sees to 4 m; markers sit on top
+FENCE_ALT_MAX_TP 1
+FENCE_MARGIN     0.5    # Loiter/AltHold avoidance stops the climb at 2.5 m
+FENCE_MARGIN_XY  0.3    # ... and 0.3 m inside the 2.5 x 2.5 m polygon (polygon edge 0.25 m inside the tracked 3 x 3 m)
+FENCE_ACTION     4      # on breach: Brake, or Land if Brake is impossible. Never RTL indoors
+AVOID_ENABLE     3      # stop at the fence in Loiter/AltHold instead of breaching it

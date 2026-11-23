@@ -9,7 +9,8 @@
                                        MAVROS --tcp:<pi>:5760--> mavlink-router (Pi) --UART--> FC
 
 Needs ros2-vicon-receiver built in the same workspace (see ROS/sim/README.md) and the FC
-loaded with config/mocap.parm. The Vicon object name in Tracker must match `subject`.
+loaded with config/mocap.parm and config/lab_limits.parm (indoor speeds + fence). lab_fence
+uploads the square fence; with lab_limits.parm the FC will not arm without it. The Vicon object name in Tracker must match `subject`.
 """
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -36,6 +37,9 @@ def nodes(context):
              parameters=[{'pose_topic': f'/vicon/{subject}/{subject}',
                           'rate_hz': float(arg('rate_hz'))}]),
 
+        Node(package='mole_mocap', executable='lab_fence', name='lab_fence', output='screen',
+             parameters=[{'half_x_m': float(arg('fence_x')) / 2, 'half_y_m': float(arg('fence_y')) / 2}]),
+
         # Pi's mavlink-router TCP server; it accepts several clients (QGC, kill switch, this).
         Node(package='mavros', executable='mavros_node', name='mavros', output='screen',
              parameters=[f'{mavros_share}/launch/apm_pluginlists.yaml',
@@ -53,6 +57,8 @@ def generate_launch_description():
                               description='object name in Vicon Tracker (topic /vicon/<subject>/<subject>)'),
         DeclareLaunchArgument('pi', default_value='mole.local',
                               description="Pi's address (10.42.0.1 on the MOLE hotspot)"),
+        DeclareLaunchArgument('fence_x', default_value='2.5', description='fence size along Vicon x (m)'),
+        DeclareLaunchArgument('fence_y', default_value='2.5', description='fence size along Vicon y (m)'),
         DeclareLaunchArgument('rate_hz', default_value='50.0', description='max pose rate sent to the FC'),
         OpaqueFunction(function=nodes),
     ])

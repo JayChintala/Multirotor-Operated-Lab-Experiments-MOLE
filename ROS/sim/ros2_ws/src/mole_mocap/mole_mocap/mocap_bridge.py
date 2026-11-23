@@ -7,6 +7,14 @@
 It also sets the EKF origin once (SET_GPS_GLOBAL_ORIGIN): with no GPS, ArduPilot will not
 use position modes (Loiter, Guided) until an origin exists.
 
+Losing Vicon in flight (on_loss:=land, the default): after loss_timeout_s without a pose while
+armed, it switches the EKF to source set 2 (no horizontal position: EK3_SRC2_POSXY 0) and
+commands LAND. Without this the EKF freezes its last position and keeps steering on it while
+the drone drifts away (5.6 m in SITL before ArduPilot's own failsafe, 8 s later, landed it).
+With no position source, Land holds the drone level and descends. Once poses are back and the
+FC is disarmed, it switches back to source set 1. If the Wi-Fi itself drops, these commands
+can't reach the FC either; the Pi's kill switch covers that case.
+
 Frames: the pose must be ENU-like (z up) with the body x axis pointing at the drone's nose and
 z up. MAVROS converts to NED/FRD. With no compass, ArduPilot's "north" is simply the Vicon +y
 axis. The Vicon object's origin should be at the drone's CoG, or set VISO_POS_X/Y/Z.
@@ -14,10 +22,14 @@ axis. The Vicon object's origin should be at the drone's CoG, or set VISO_POS_X/
 import rclpy
 from geographic_msgs.msg import GeoPointStamped
 from geometry_msgs.msg import PoseStamped
+from mavros_msgs.msg import State
+from mavros_msgs.srv import CommandLong, SetMode
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy, qos_profile_sensor_data
 
 from mole_mocap.mocap_math import RateLimiter, pose_ok
+
+MAV_CMD_SET_EKF_SOURCE_SET = 42007
 
 
 class MocapBridge(Node):
@@ -30,6 +42,10 @@ class MocapBridge(Node):
         # Default: the SITL home (sitl.launch.py HOME / mole_field.sdf). Any fixed point works
         # indoors; it only anchors the local frame for ArduPilot's lat/lon bookkeeping.
         self.origin = (p('origin_lat', 40.4433), p('origin_lon', -79.9436), p('origin_alt', 280.0))
+        self.on_loss = p('on_loss', 'land')          # 'land' or 'none'
+        self.loss_timeout = p('loss_timeout_s', 0.5)
+        self.fc_state = None
+        self.lost_action_taken = False             # source set 2 + LAND sent for this loss
 
         self.limiter = RateLimiter(rate_hz)
         self.origin_set = False
@@ -46,6 +62,10 @@ class MocapBridge(Node):
         self.create_subscription(PoseStamped, self.pose_topic, self.on_pose, qos_profile_sensor_data)
         self.create_timer(2.0, self.send_origin)
         self.create_timer(1.0, self.watchdog)
+        self.create_subscription(State, '/mavros/state', self.on_state, 10)
+        self.cmd = self.create_client(CommandLong, '/mavros/cmd/command')
+        self.set_mode = self.create_client(SetMode, '/mavros/set_mode')
+        self.create_timer(0.1, self.loss_check)
         self.get_logger().info(f'{self.pose_topic} -> /mavros/vision_pose/pose at <= {rate_hz:g} Hz')
 
     def on_pose(self, msg):
@@ -90,6 +110,29 @@ class MocapBridge(Node):
             self.get_logger().info(f'FC confirmed EKF origin {msg.position.latitude:.6f}, '
                                    f'{msg.position.longitude:.6f}')
         self.origin_set = True
+
+    def on_state(self, msg):
+        self.fc_state = msg
+
+    def source_set(self, n):
+        req = CommandLong.Request(command=MAV_CMD_SET_EKF_SOURCE_SET, param1=float(n))
+        self.cmd.call_async(req)
+
+    def loss_check(self):
+        if self.on_loss != 'land' or self.fc_state is None:
+            return
+        now = self.get_clock().now().nanoseconds * 1e-9
+        lost = self.last_rx is None or now - self.last_rx > self.loss_timeout
+        if lost and self.fc_state.armed and not self.lost_action_taken:
+            self.lost_action_taken = True
+            self.source_set(2)
+            self.set_mode.call_async(SetMode.Request(custom_mode='LAND'))
+            self.get_logger().error(f'Vicon lost for > {self.loss_timeout} s in flight: EKF source set 2 '
+                                    '(no position) and LAND sent')
+        elif not lost and not self.fc_state.armed and self.lost_action_taken:
+            self.lost_action_taken = False
+            self.source_set(1)
+            self.get_logger().info('Vicon back and disarmed: EKF source set 1 (Vicon) again')
 
     def watchdog(self):
         now = self.get_clock().now().nanoseconds * 1e-9
