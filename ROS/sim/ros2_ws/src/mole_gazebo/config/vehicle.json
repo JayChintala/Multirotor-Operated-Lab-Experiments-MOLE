@@ -55,29 +55,59 @@
   "payloads": [
     {
       "name": "water_module",
-      "enabled": true,
-      "_source": "config/payloads/water_module.urdf, from branch manan commit 33f060d (2026-11-15): 20 parts, 482 g, mass properties from STEP normalised to the measured mass. Its meshes are not on GitHub, so the model shows a box.",
+      "enabled": false,
+      "_source": "config/payloads/water_module.urdf, from branch manan commit 33f060d (2026-11-15): 20 parts, 482 g, mass properties from STEP normalised to the measured mass.",
       "urdf": "config/payloads/water_module.urdf",
-      "_mount": "Team 2026-11-15: centred under the frame, long side (module y, 186 mm) side to side, so no rotation.",
+      "_mount": "Team 2026-11-15: centred under the frame, long side (module y, 197 mm) side to side, so no rotation.",
       "mount_xy_m": [0.0, 0.0],
       "mount_top_z_m": -0.0105,
       "yaw_deg": 0,
-      "top_z_m": 0.0425,
-      "_top_z": "ASSUMED: module top face height in its own axes = CoM z (-4.95 mm) + half the equivalent box height (47.5 mm). Check against the CAD.",
+      "top_z_m": 0.0385,
+      "_top_z": "Highest point of the CAD in module axes: top of the cap (part 02). ASSUMED to touch the frame's underside; the lid itself is at 29.5 mm, so if the cap fits through a hole in the frame, use 0.0295.",
+      "mesh_dir": "meshes/water_module",
+      "_meshes": "From branch manan ROS/watermodule.zip (commit dd3f251) by scripts/import_water_module.py: simplified CAD meshes in module axes. Part names from the STEP products; the CAD only numbers its solids.",
+      "visual_meshes": [
+        {"mesh": "tank", "rgba": [0.75, 0.78, 0.82, 0.5], "_parts": "00 floor + servo brackets, 01 walls, 03 lid: one sealed box"},
+        {"mesh": "cap", "rgba": [0.95, 0.55, 0.1, 1]},
+        {"mesh": "servos", "rgba": [0.15, 0.15, 0.6, 1], "_parts": "04-13: two MG90S servos"},
+        {"mesh": "servo_links", "rgba": [0.85, 0.85, 0.85, 1], "_parts": "16, 17: servohorn attachments"},
+        {"mesh": "valve_left", "rgba": [0.55, 0.35, 0.8, 1], "_parts": "14: Ball Valve V2 housing (funnel), +y"},
+        {"mesh": "valve_right", "rgba": [0.55, 0.35, 0.8, 1], "_parts": "15: Ball Valve V2 housing (funnel), -y"},
+        {"mesh": "ball_left", "rgba": [0.55, 0.3, 0.25, 1], "_parts": "18: valve ball"},
+        {"mesh": "ball_right", "rgba": [0.55, 0.3, 0.25, 1], "_parts": "19: valve ball"}
+      ],
+      "collision_meshes": ["tank_hull", "valve_left_hull", "valve_right_hull"],
+      "_collision": "convex hulls of the tank and of each valve housing; the hanging valves are the lowest point (71.2 mm below the module origin)",
       "box_size_m": [0.096, 0.186, 0.095],
-      "_box_size": "solid box with the module's mass and principal inertias (body axes), used for collision and display"
+      "_box_size": "used only if visual_meshes is removed: solid box with the module's mass and principal inertias"
     }
   ],
+
+  "landing_gear": {
+    "enabled": true,
+    "_status": "ASSUMED, not a real part (2026-11-16). With the water module fitted the drone rests on its two ball valves (~30 mm fore-aft, CoG ~130 mm above them) and tips over, so the sim needs gear to take off and land. Replace with the team's design (open question: leg length and spacing).",
+    "legs_xy_m": [[0.098, 0.129], [0.098, -0.129], [-0.098, 0.129], [-0.098, -0.129]],
+    "_legs_xy": "70 % of the motor positions: under the arms, clear of the module (x +-50, y +-99 mm)",
+    "top_z_m": -0.0105,
+    "bottom_z_m": -0.138,
+    "_bottom_z": "20 mm below the module's lowest point (-118 mm, bottom of the ball valves)",
+    "leg_radius_m": 0.005,
+    "foot_radius_m": 0.008,
+    "mass_kg_each": 0.015,
+    "_mass": "ASSUMED: carbon tube plus foot"
+  },
 
   "loads": [
     {
       "name": "water",
-      "enabled": true,
+      "enabled": false,
       "inside": "water_module",
       "mass_kg": 0.5,
       "_mass": "Team 2026-11-15: up to 500 ml in flight. Override per run: gen_model.py --load water=0 (empty) or =0.25 etc.",
-      "fill_height_fraction": 0.5,
-      "_fill": "Team: approximate the water as filling the bottom half of the module's box. That block (96 x 186 x 47.5 mm) holds ~848 ml, more than 500 ml, so the 500 g is spread over it (centre of mass and inertia approximate). Rigidly attached for now; sloshing is not modelled yet."
+      "tank_min_m": [-0.046, -0.086, -0.0045],
+      "tank_max_m": [0.046, 0.086, 0.0245],
+      "_tank": "Inside of the module's single tank, measured in the CAD meshes (module axes): walls (part 01) at x +-46 and y +-86 mm, floor top (part 00) at z -4.5 mm, lid underside (part 03) at z 24.5 mm. 92 x 172 x 29 mm = 459 ml. The water fills it from the floor up as one rigid block (no sloshing yet). 500 ml does not fit: gen_model.py then fills the tank and warns. The CAD shows no opening between the tank floor and the two ball valves below it, so the valves hold no water here.",
+      "density_kg_m3": 1000
     }
   ],
 

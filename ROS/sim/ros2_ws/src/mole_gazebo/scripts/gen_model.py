@@ -51,6 +51,14 @@ def material(r, g, b, a=1.0):
             f'<specular>0.2 0.2 0.2 1</specular></material>')
 
 
+def stl_points(path):
+    """Vertices of a binary STL (as written by import_water_module.py), shape (n, 3)."""
+    b = path.read_bytes()
+    n = int.from_bytes(b[80:84], 'little')
+    rec = np.frombuffer(b[84:84 + 50 * n], dtype=np.dtype([('n', '<3f4'), ('v', '<9f4'), ('x', '<u2')]))
+    return rec['v'].reshape(-1, 3).astype(float)
+
+
 def urdf_mass_properties(path):
     """Total mass, CoM and inertia about the CoM of a URDF whose links hang off the root by fixed joints."""
     root = ET.parse(path).getroot()
@@ -117,10 +125,32 @@ def main():
         pcom = origin + Rp @ pcom_mod
         size = np.array(pl['box_size_m'])                     # body axes
         box_centre = np.array([*pl['mount_xy_m'], pl['mount_top_z_m'] - size[2] / 2])
-        payloads.append({'name': pl['name'], 'mass': pm_, 'com': pcom, 'I': Rp @ pI_mod @ Rp.T,
-                         'size': size, 'centre': box_centre})
+        p = {'name': pl['name'], 'mass': pm_, 'com': pcom, 'I': Rp @ pI_mod @ Rp.T,
+             'size': size, 'centre': box_centre, 'origin': origin, 'R': Rp, 'yaw': math.radians(pl['yaw_deg']),
+             'visuals': pl.get('visual_meshes', []), 'collisions': pl.get('collision_meshes', []),
+             'mesh_dir': pl.get('mesh_dir', '')}
+        if p['visuals']:
+            # Lowest point from the collision meshes (module axes -> body axes).
+            pts = np.concatenate([stl_points(PKG / 'models/mole_quad' / p['mesh_dir'] / f'{c}.stl')
+                                  for c in p['collisions']])
+            p['lowest'] = (origin + pts @ Rp.T)[:, 2].min()
+        else:
+            p['lowest'] = box_centre[2] - size[2] / 2
+        payloads.append(p)
+    # Landing gear: vertical legs (cylinders) with a ball foot, fixed to the frame.
+    gear = v.get('landing_gear', {})
+    legs = []
+    if gear.get('enabled'):
+        top, bottom, r, rf = gear['top_z_m'], gear['bottom_z_m'], gear['leg_radius_m'], gear['foot_radius_m']
+        h = top - (bottom + rf)                                   # leg ends at the foot's centre
+        mg = gear['mass_kg_each']
+        I_leg = np.diag([mg / 12 * (3 * r * r + h * h)] * 2 + [mg * r * r / 2])
+        for k, (x, y) in enumerate(gear['legs_xy_m']):
+            legs.append({'name': f'leg_{k + 1}', 'x': x, 'y': y, 'z': top - h / 2, 'h': h, 'r': r,
+                         'foot_z': bottom + rf, 'rf': rf, 'mass': mg, 'I': I_leg})
     base_m, base_com, base_I = combine([frame_part, bat_part]
-                                       + [(p['mass'], p['com'], p['I']) for p in payloads])
+                                       + [(p['mass'], p['com'], p['I']) for p in payloads]
+                                       + [(lg['mass'], np.array([lg['x'], lg['y'], lg['z']]), lg['I']) for lg in legs])
 
     # Loads carried inside a payload (e.g. water): separate links, fixed to base_link for now.
     loads = []
@@ -129,11 +159,27 @@ def main():
         if mass <= 0:
             continue
         host = next(p for p in payloads if p['name'] == ld['inside'])
-        size = host['size'] * np.array([1.0, 1.0, ld['fill_height_fraction']])
-        bottom = host['centre'][2] - host['size'][2] / 2
-        centre = np.array([host['centre'][0], host['centre'][1], bottom + size[2] / 2])
-        loads.append({'name': ld['name'], 'mass': mass, 'size': size, 'centre': centre,
-                      'I': box_inertia(mass, *size)})
+        if 'tank_min_m' in ld:
+            # Water fills the measured tank (module axes) from the floor up.
+            lo, hi = np.array(ld['tank_min_m']), np.array(ld['tank_max_m'])
+            footprint = (hi[0] - lo[0]) * (hi[1] - lo[1])
+            volume = mass / ld.get('density_kg_m3', 1000.0)
+            capacity = footprint * (hi[2] - lo[2])
+            if volume > capacity * 1.001:
+                print(f'WARNING: {ld["name"]}: {volume * 1e6:.0f} ml does not fit in the {capacity * 1e6:.0f} ml tank; '
+                      f'modelled as a full tank carrying {mass * 1000:.0f} g')
+            height = min(volume / footprint, hi[2] - lo[2])
+            size_mod = np.array([hi[0] - lo[0], hi[1] - lo[1], height])
+            centre_mod = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2] + height / 2])
+            centre = host['origin'] + host['R'] @ centre_mod
+            size = np.abs(host['R']) @ size_mod                    # exact for yaw multiples of 90 deg
+            I = host['R'] @ box_inertia(mass, *size_mod) @ host['R'].T
+        else:
+            size = host['size'] * np.array([1.0, 1.0, ld['fill_height_fraction']])
+            bottom = host['centre'][2] - host['size'][2] / 2
+            centre = np.array([host['centre'][0], host['centre'][1], bottom + size[2] / 2])
+            I = box_inertia(mass, *size)
+        loads.append({'name': ld['name'], 'mass': mass, 'size': size, 'centre': centre, 'I': I})
 
     # Props as separate spinning links (thin rod about z for the spin inertia).
     pm, pr, pj = prop['mass_kg'], prop['diameter_m'] / 2, prop['spin_inertia_kg_m2']
@@ -248,7 +294,27 @@ def main():
         {material(0.08, 0.08, 0.08)}
       </visual>''' for m in mot['list'])
 
-    payload_xml = ''.join(f'''
+    def mesh_payload_xml(p):
+        pose = f"{p['origin'][0]:.4f} {p['origin'][1]:.4f} {p['origin'][2]:.4f} 0 0 {p['yaw']:.6f}"
+        uri = f"model://mole_quad/{p['mesh_dir']}"
+        xml = ''.join(f'''
+      <collision name="{p['name']}_{c}">
+        <pose>{pose}</pose>
+        <geometry><mesh><uri>{uri}/{c}.stl</uri></mesh></geometry>
+      </collision>''' for c in p['collisions'])
+        for vm in p['visuals']:
+            rgba = vm['rgba']
+            xml += f'''
+      <visual name="{p['name']}_{vm['mesh']}">
+        <pose>{pose}</pose>
+        <geometry><mesh><uri>{uri}/{vm['mesh']}.stl</uri></mesh></geometry>{
+            f"""
+        <transparency>{1 - rgba[3]:.2f}</transparency>""" if rgba[3] < 1 else ''}
+        {material(*rgba)}
+      </visual>'''
+        return xml
+
+    payload_xml = ''.join(mesh_payload_xml(p) for p in payloads if p['visuals']) + ''.join(f'''
       <collision name="{p['name']}_collision">
         <pose>{p['centre'][0]:.4f} {p['centre'][1]:.4f} {p['centre'][2]:.4f} 0 0 0</pose>
         <geometry><box><size>{p['size'][0]} {p['size'][1]} {p['size'][2]}</size></box></geometry>
@@ -258,7 +324,23 @@ def main():
         <geometry><box><size>{p['size'][0]} {p['size'][1]} {p['size'][2]}</size></box></geometry>
         <transparency>0.6</transparency>
         {material(0.75, 0.78, 0.82, 0.4)}
-      </visual>''' for p in payloads)
+      </visual>''' for p in payloads if not p['visuals'])
+
+    gear_xml = ''.join(f'''
+      <collision name="{lg['name']}_foot">
+        <pose>{lg['x']} {lg['y']} {lg['foot_z']:.4f} 0 0 0</pose>
+        <geometry><sphere><radius>{lg['rf']}</radius></sphere></geometry>
+      </collision>
+      <visual name="{lg['name']}">
+        <pose>{lg['x']} {lg['y']} {lg['z']:.4f} 0 0 0</pose>
+        <geometry><cylinder><radius>{lg['r']}</radius><length>{lg['h']:.4f}</length></cylinder></geometry>
+        {material(0.1, 0.1, 0.1)}
+      </visual>
+      <visual name="{lg['name']}_foot">
+        <pose>{lg['x']} {lg['y']} {lg['foot_z']:.4f} 0 0 0</pose>
+        <geometry><sphere><radius>{lg['rf']}</radius></sphere></geometry>
+        {material(0.9, 0.3, 0.1)}
+      </visual>''' for lg in legs)
 
     load_xml = ''.join(f'''
     <link name="{ld['name']}">
@@ -301,7 +383,7 @@ def main():
         <pose>{bat_com[0]} {bat_com[1]} {bat_com[2]:.4f} 0 0 0</pose>
         <geometry><box><size>{bx} {by} {bz}</size></box></geometry>
       </collision>
-{payload_xml}
+{payload_xml}{gear_xml}
       <visual name="frame">
         <pose>0 0 0 0 0 {yaw:.6f}</pose>
         <geometry><mesh><uri>model://mole_quad/{fr['mesh']}</uri></mesh></geometry>
@@ -370,7 +452,10 @@ def main():
     w_h = math.sqrt(total_m * 9.80665 / 4 / kT)
     hover_cmd = w_h / mot['speed_per_cmd_rad_s'] - mot['speed_offset']
     print(f'  expected hover: {w_h:.0f} rad/s, cmd {hover_cmd:.3f}')
-    lowest = min([fr['bottom_z_m']] + [p['centre'][2] - p['size'][2] / 2 for p in payloads])
+    lowest = min([fr['bottom_z_m']] + [p['lowest'] for p in payloads] + [lg['foot_z'] - lg['rf'] for lg in legs])
+    if legs:
+        print(f'  landing gear (ASSUMED): {len(legs)} legs x {legs[0]["mass"] * 1000:.0f} g, '
+              f'feet at {np.round((legs[0]["foot_z"] - legs[0]["rf"]) * 1000)} mm')
     (PKG / 'models/mole_quad/predicted.json').write_text(json.dumps({
         '_comment': 'Written by gen_model.py; read by smoke_test.py',
         'total_mass_kg': round(total_m, 4), 'hover_cmd': round(hover_cmd, 4),
