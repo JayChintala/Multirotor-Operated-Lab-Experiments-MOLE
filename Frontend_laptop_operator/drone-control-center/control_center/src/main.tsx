@@ -160,6 +160,12 @@ function App() {
               killRef.current = true;
               setKillRequested(true);
             }
+          } else if (message.type === "KILL_CLEARED") {
+            // Only an explicit clear from the backend unlatches; a status with
+            // kill_requested=false (e.g. a restarted backend) does not.
+            killRef.current = false;
+            setKillRequested(false);
+            addLog("Kill cleared; heartbeats resumed. Drone can be armed.");
           } else if (message.type === "ERROR") {
             addLog(`Backend error: ${message.message}`);
           }
@@ -348,6 +354,15 @@ function App() {
     socket.send(JSON.stringify({ version: 1, type: "KILL", time_ms: Date.now() }));
     addLog("KILL requested; waiting for Pi. Check measured motor RPM.");
   };
+  const clearKill = () => {
+    if (socket?.readyState !== WebSocket.OPEN) {
+      addLog("CLEAR KILL NOT SENT: backend disconnected");
+      return;
+    }
+    if (!window.confirm("Clear the kill? The drone can be armed again once it is cleared.")) return;
+    socket.send(JSON.stringify({ version: 1, type: "CLEAR_KILL", time_ms: Date.now() }));
+    addLog("CLEAR KILL requested; waiting for backend.");
+  };
   const killStatusFresh = connected && killStatus?.age_ms != null
     && killStatus.age_ms + Date.now() - lastKillStatusTime < 2000;
 
@@ -369,7 +384,7 @@ function App() {
     <main className="screen">
       <button className="signal-open" onClick={() => setShowSignals(true)}>SIGNAL MONITOR</button>
       {showSignals && <SignalMonitor events={signals} connected={connected} dropped={signalDrops}
-        onClose={() => setShowSignals(false)} onKill={sendKill} />}
+        onClose={() => setShowSignals(false)} onKill={sendKill} onClearKill={clearKill} killRequested={killRequested} />}
       <section className="panel camera-panel">
         <PanelTitle title="CAMERA" status={cameraLive ? "LIVE" : "NO SIGNAL"} live={cameraLive} />
         <div className="camera-content">
@@ -448,7 +463,11 @@ function App() {
 
       <section className="panel trigger-panel">
         <PanelTitle title="TRIGGERS" />
-        <button className="kill-button" onClick={sendKill} disabled={!connected}>KILL MOTORS</button>
+        <div className="kill-row">
+          <button className="kill-button" onClick={sendKill} disabled={!connected}>KILL MOTORS</button>
+          <button className="clear-kill-button" onClick={clearKill} disabled={!connected || !killRequested}
+            title={killRequested ? "Unlatch the kill so the drone can be armed" : "No kill to clear"}>CLEAR KILL</button>
+        </div>
         <div role="status" className="kill-status">
           {!connected ? "Backend disconnected — KILL unavailable" :
             killRequested ? (killStatusFresh && killStatus?.kill_latched

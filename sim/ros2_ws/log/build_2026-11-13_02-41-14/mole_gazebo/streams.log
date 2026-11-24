@@ -1,0 +1,34 @@
+[0.012s] Invoking command in '/home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo -- -j10 -l10
+[0.068s] Invoked command in '/home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo -- -j10 -l10
+[0.077s] Invoking command in '/home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo
+[0.083s] -- Install configuration: ""
+[0.085s] -- Execute custom install script
+[0.086s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/mole_quad.parm
+[0.087s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/sitl_gps.parm
+[0.087s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/sitl_nogps.parm
+[0.088s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/sitl_overrides.parm
+[0.088s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/vehicle.json
+[0.089s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/launch/sitl.launch.py
+[0.091s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/models/mole_quad/meshes/frame.stl
+[0.092s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/models/mole_quad/model.config
+[0.092s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/models/mole_quad/model.sdf
+[0.093s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/worlds/mole_field.sdf
+[0.094s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/lib/mole_gazebo/smoke_test.py
+[0.094s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/lib/mole_gazebo/gen_model.py
+[0.095s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/lib/mole_gazebo/extract_params.py
+[0.096s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/ament_index/resource_index/package_run_dependencies/mole_gazebo
+[0.097s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/ament_index/resource_index/parent_prefix_path/mole_gazebo
+[0.097s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/environment/ament_prefix_path.sh
+[0.098s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/environment/ament_prefix_path.dsv
+[0.098s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/environment/path.sh
+[0.099s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/environment/path.dsv
+[0.099s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/local_setup.bash
+[0.100s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/local_setup.sh
+[0.100s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/local_setup.zsh
+[0.101s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/local_setup.dsv
+[0.101s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/package.dsv
+[0.110s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/ament_index/resource_index/packages/mole_gazebo
+[0.110s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/cmake/mole_gazeboConfig.cmake
+[0.111s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/cmake/mole_gazeboConfig-version.cmake
+[0.111s] -- Up-to-date symlink: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/package.xml
+[0.113s] Invoked command in '/home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo

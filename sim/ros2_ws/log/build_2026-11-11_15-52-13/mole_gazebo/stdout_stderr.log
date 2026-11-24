@@ -1,0 +1,36 @@
+-- Found ament_cmake: 2.5.6 (/opt/ros/jazzy/share/ament_cmake/cmake)
+-- Found Python3: /home/ubuntu/venv-ardupilot/bin/python3 (found version "3.12.3") found components: Interpreter 
+-- Override CMake install command with custom implementation using symlinks instead of copying resources
+-- Configuring done (0.4s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo
+-- Install configuration: ""
+-- Execute custom install script
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/mole_quad.parm
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/sitl_gps.parm
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/sitl_nogps.parm
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/sitl_overrides.parm
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/vehicle.json
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/launch/sitl.launch.py
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/models/mole_quad/meshes/frame.stl
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/models/mole_quad/model.config
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/models/mole_quad/model.sdf
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/worlds/mole_field.sdf
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/lib/mole_gazebo/smoke_test.py
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/lib/mole_gazebo/gen_model.py
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/lib/mole_gazebo/extract_params.py
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/ament_index/resource_index/package_run_dependencies/mole_gazebo
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/ament_index/resource_index/parent_prefix_path/mole_gazebo
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/environment/ament_prefix_path.sh
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/environment/ament_prefix_path.dsv
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/environment/path.sh
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/environment/path.dsv
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/local_setup.bash
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/local_setup.sh
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/local_setup.zsh
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/local_setup.dsv
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/package.dsv
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/ament_index/resource_index/packages/mole_gazebo
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/cmake/mole_gazeboConfig.cmake
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/cmake/mole_gazeboConfig-version.cmake
+-- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/package.xml

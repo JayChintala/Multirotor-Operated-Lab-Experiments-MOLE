@@ -4,9 +4,9 @@ import "./signalMonitor.css";
 
 const timeLabel = (time: number) => new Date(time).toLocaleTimeString([], {hour12: false}) + "." + String(time % 1000).padStart(3, "0");
 
-export default function SignalMonitor({events, connected, dropped, onClose, onKill}: {
+export default function SignalMonitor({events, connected, dropped, onClose, onKill, onClearKill, killRequested}: {
   events: SignalEvent[]; connected: boolean; dropped: number;
-  onClose: () => void; onKill: () => void;
+  onClose: () => void; onKill: () => void; onClearKill: () => void; killRequested: boolean;
 }) {
   const [paused, setPaused] = useState<SignalEvent[] | null>(null);
   const [demo, setDemo] = useState<SignalEvent[] | null>(null);
@@ -56,6 +56,7 @@ export default function SignalMonitor({events, connected, dropped, onClose, onKi
       <div className="signal-actions">
         <span className={`signal-connection ${connected ? "online" : ""}`}>{connected ? "Backend connected" : "Backend offline"}</span>
         <button className="signal-kill" onClick={onKill} disabled={!connected || !!demo}>KILL MOTORS</button>
+        <button className="signal-clear-kill" onClick={onClearKill} disabled={!connected || !!demo || !killRequested}>CLEAR KILL</button>
         <button ref={closeRef} onClick={onClose}>Close monitor</button>
       </div>
     </header>

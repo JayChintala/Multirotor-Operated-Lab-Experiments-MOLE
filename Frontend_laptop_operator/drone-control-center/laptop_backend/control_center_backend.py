@@ -8,7 +8,9 @@ producer over WebSocket and relayed to the browser clients.
 Kill switch: while at least one browser is connected, KILL_HEARTBEAT packets go
 to the Pi's kill receiver (UDP 5002) at 10 Hz, and KILL from the browser is
 forwarded there. Use companion/manual_kill_switch.py for the manual-only bench receiver.
-KILL is latched and retransmitted until backend restart; CONTROL is blocked.
+KILL is latched and retransmitted, and CONTROL is blocked, until CLEAR_KILL from
+the browser (accepted only while fresh Pi status shows the FC disarmed) or a
+backend restart.
 Heartbeat/status polling does not trigger shutdown in the manual receiver.
 """
 
@@ -32,6 +34,7 @@ from websockets.asyncio.server import ServerConnection, serve
 MAX_WEBSOCKET_MESSAGE_SIZE = 2 * 1024 * 1024
 KILL_HEARTBEAT_PERIOD = 0.1  # s; status polls, or repeated KILL while latched
 KILL_REPEATS = 5             # UDP can drop packets, so each KILL is sent this many times
+KILL_CLEAR_MAX_STATUS_AGE = 2.0  # s; CLEAR_KILL needs Pi status at least this fresh showing disarmed
 
 
 class Bridge:
@@ -314,6 +317,15 @@ class Bridge:
                 elif message_type == "KILL":
                     print("KILL from the control center")
                     await self.send_kill()
+                elif message_type == "CLEAR_KILL":
+                    refusal = self.clear_kill()
+                    if refusal:
+                        print(f"CLEAR_KILL refused: {refusal}")
+                        await websocket.send(json.dumps({"version": 1, "type": "ERROR", "message": f"Kill not cleared: {refusal}"}))
+                    else:
+                        print("Kill cleared from the control center")
+                        await self.broadcast({"version": 1, "type": "KILL_CLEARED", "time_ms": int(time.time() * 1000)})
+                        await self.broadcast(self.status())
                 elif message_type == "CONFIG":
                     await websocket.send(json.dumps(self.status()))
                 else:
@@ -374,6 +386,26 @@ class Bridge:
         for _ in range(KILL_REPEATS):
             self.send_kill_packet(message)
             await asyncio.sleep(0.02)
+
+    def clear_kill(self) -> Optional[str]:
+        """Unlatch KILL so heartbeats resume. Returns why it was refused, or None.
+
+        Only allowed while fresh Pi status shows the FC disarmed and the Pi
+        receiver itself not latched, so a clear can never cancel a disarm that
+        is still in progress.
+        """
+        with self.state_lock:
+            status = self.last_kill_status
+            age = time.monotonic() - self.last_kill_status_monotonic
+            if status is None or age > KILL_CLEAR_MAX_STATUS_AGE:
+                return "no recent status from the Pi kill switch"
+            if status.get("armed") is not False:
+                return "FC is still armed"
+            if status.get("kill_latched"):
+                return "the Pi kill receiver is latched (restart it on the Pi)"
+            self.kill_latched = False
+        self.log_json("tx", "internal", {"version": 1, "type": "KILL_CLEARED"})
+        return None
 
     async def kill_heartbeat_loop(self) -> None:
         # Poll status while a browser is open; keep retransmitting latched KILL

@@ -1,0 +1,42 @@
+[0.015s] Invoking command in '/home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy PS1=(venv-ardupilot) VIRTUAL_ENV_PROMPT=(venv-ardupilot) /usr/bin/cmake /home/ubuntu/mole/sim/ros2_ws/src/mole_gazebo -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo
+[0.042s] -- Found ament_cmake: 2.5.6 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[0.175s] -- Found Python3: /home/ubuntu/venv-ardupilot/bin/python3 (found version "3.12.3") found components: Interpreter 
+[0.241s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[0.426s] -- Configuring done (0.4s)
+[0.455s] -- Generating done (0.0s)
+[0.469s] -- Build files have been written to: /home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo
+[0.469s] Invoked command in '/home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy PS1=(venv-ardupilot) VIRTUAL_ENV_PROMPT=(venv-ardupilot) /usr/bin/cmake /home/ubuntu/mole/sim/ros2_ws/src/mole_gazebo -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo
+[0.471s] Invoking command in '/home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy PS1=(venv-ardupilot) VIRTUAL_ENV_PROMPT=(venv-ardupilot) /usr/bin/cmake --build /home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo -- -j6 -l6
+[0.506s] Invoked command in '/home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy PS1=(venv-ardupilot) VIRTUAL_ENV_PROMPT=(venv-ardupilot) /usr/bin/cmake --build /home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo -- -j6 -l6
+[0.515s] Invoking command in '/home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy PS1=(venv-ardupilot) VIRTUAL_ENV_PROMPT=(venv-ardupilot) /usr/bin/cmake --install /home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo
+[0.522s] -- Install configuration: ""
+[0.523s] -- Execute custom install script
+[0.526s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/mole_quad.parm
+[0.533s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/sitl_gps.parm
+[0.542s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/sitl_nogps.parm
+[0.550s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/sitl_overrides.parm
+[0.557s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/config/vehicle.json
+[0.566s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/launch/sitl.launch.py
+[0.576s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/models/mole_quad/meshes/frame.stl
+[0.583s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/models/mole_quad/model.config
+[0.590s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/models/mole_quad/model.sdf
+[0.598s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/worlds/mole_field.sdf
+[0.606s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/lib/mole_gazebo/smoke_test.py
+[0.613s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/lib/mole_gazebo/gen_model.py
+[0.621s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/lib/mole_gazebo/extract_params.py
+[0.629s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/ament_index/resource_index/package_run_dependencies/mole_gazebo
+[0.637s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/ament_index/resource_index/parent_prefix_path/mole_gazebo
+[0.645s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/environment/ament_prefix_path.sh
+[0.652s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/environment/ament_prefix_path.dsv
+[0.660s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/environment/path.sh
+[0.667s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/environment/path.dsv
+[0.675s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/local_setup.bash
+[0.682s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/local_setup.sh
+[0.689s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/local_setup.zsh
+[0.697s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/local_setup.dsv
+[0.704s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/package.dsv
+[0.712s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/ament_index/resource_index/packages/mole_gazebo
+[0.719s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/cmake/mole_gazeboConfig.cmake
+[0.726s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/cmake/mole_gazeboConfig-version.cmake
+[0.734s] -- Symlinking: /home/ubuntu/mole/sim/ros2_ws/install/mole_gazebo/share/mole_gazebo/package.xml
+[0.742s] Invoked command in '/home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy PS1=(venv-ardupilot) VIRTUAL_ENV_PROMPT=(venv-ardupilot) /usr/bin/cmake --install /home/ubuntu/mole/sim/ros2_ws/build/mole_gazebo

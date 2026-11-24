@@ -1,0 +1,1 @@
+/home/ubuntu/mole/sim/ros2_ws/src/mole_gazebo/launch/sitl.launch.py

@@ -10,6 +10,7 @@
 .signal-connection { color: #b8a28f; font-size: 14px; }
 .signal-connection.online { color: #8fd8b3; }
 .signal-monitor .signal-kill { background: #a42a39; border-color: #ee7c88; font-weight: 700; }
+.signal-monitor .signal-clear-kill { color: #f2c94c; border-color: #f2c94c; font-weight: 700; }
 .signal-intro { margin: 0; color: #a5b7c9; font-size: 14px; }
 .signal-routes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .signal-monitor .signal-route { text-align: left; padding: 18px; background: #172332; }

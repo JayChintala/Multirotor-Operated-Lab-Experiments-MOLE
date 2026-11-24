@@ -1,0 +1,4 @@
+source;share/mole_gazebo/local_setup.bash
+source;share/mole_gazebo/local_setup.dsv
+source;share/mole_gazebo/local_setup.sh
+source;share/mole_gazebo/local_setup.zsh

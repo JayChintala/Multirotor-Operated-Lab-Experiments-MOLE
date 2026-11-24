@@ -101,3 +101,8 @@ button { font: inherit; }
 .kill-button { margin: 12px; padding: 16px; background: #ba202c; color: white; border: 2px solid #ff7d86; border-radius: 6px; font-weight: 800; cursor: pointer; }
 .kill-button:disabled { opacity: .45; cursor: not-allowed; }
 .kill-status { padding: 0 12px 12px; font-size: 12px; }
+.kill-row { display: flex; gap: 10px; margin: 12px; }
+.kill-row .kill-button { flex: 3; margin: 0; }
+.clear-kill-button { flex: 1; min-width: 0; padding: 10px; background: transparent; color: #f2c94c; border: 2px solid #f2c94c; border-radius: 6px; font-weight: 800; letter-spacing: 1px; cursor: pointer; }
+.clear-kill-button:hover { background: rgba(242, 201, 76, .12); }
+.clear-kill-button:disabled { opacity: .45; cursor: not-allowed; }
