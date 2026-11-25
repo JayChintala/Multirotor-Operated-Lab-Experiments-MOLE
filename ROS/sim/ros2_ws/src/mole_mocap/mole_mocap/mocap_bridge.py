@@ -5,7 +5,11 @@
         -> /mavros/vision_pose/pose  (MAVROS sends VISION_POSITION_ESTIMATE to the FC)
 
 It also sets the EKF origin once (SET_GPS_GLOBAL_ORIGIN): with no GPS, ArduPilot will not
-use position modes (Loiter, Guided) until an origin exists.
+use position modes (Loiter, Guided) until an origin exists. ArduPilot answers only when it
+actually sets the origin; if it already has one (FC not rebooted since an earlier run) it
+ignores the request silently. So each try also asks for the origin (MAV_CMD_REQUEST_MESSAGE
+GPS_GLOBAL_ORIGIN), which the FC answers whenever it has one. MAVROS publishes the answer on
+/mavros/global_position/gp_origin, which also releases lab_fence.
 
 Losing Vicon in flight (on_loss:=land, the default): after loss_timeout_s without a pose while
 armed, it switches the EKF to source set 2 (no horizontal position: EK3_SRC2_POSXY 0) and
@@ -30,6 +34,8 @@ from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy, qos
 from mole_mocap.mocap_math import RateLimiter, pose_ok
 
 MAV_CMD_SET_EKF_SOURCE_SET = 42007
+MAV_CMD_REQUEST_MESSAGE = 512
+MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN = 49
 
 
 class MocapBridge(Node):
@@ -101,14 +107,20 @@ class MocapBridge(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.position.latitude, msg.position.longitude, msg.position.altitude = self.origin
         self.origin_pub.publish(msg)
+        if self.cmd.service_is_ready():
+            self.cmd.call_async(CommandLong.Request(command=MAV_CMD_REQUEST_MESSAGE,
+                                                    param1=float(MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN)))
         if self.origin_tries % 5 == 1:
             self.get_logger().info(f'setting EKF origin {self.origin} (try {self.origin_tries}); '
                                    'waiting for the FC to confirm')
 
     def on_origin(self, msg):
         if not self.origin_set:
-            self.get_logger().info(f'FC confirmed EKF origin {msg.position.latitude:.6f}, '
-                                   f'{msg.position.longitude:.6f}')
+            lat, lon = msg.position.latitude, msg.position.longitude
+            self.get_logger().info(f'FC confirmed EKF origin {lat:.6f}, {lon:.6f}')
+            if abs(lat - self.origin[0]) > 1e-4 or abs(lon - self.origin[1]) > 1e-4:
+                self.get_logger().warn('the FC kept an older origin (it cannot be changed until the '
+                                       'FC reboots); fine indoors, the fence is built around it')
         self.origin_set = True
 
     def on_state(self, msg):
