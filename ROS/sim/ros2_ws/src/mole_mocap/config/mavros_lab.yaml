@@ -7,3 +7,8 @@
     # so with the default the time sync never converges. Vision data is unaffected either way
     # (ArduPilot corrects incoming timestamps itself), but log times and warnings are.
     max_rtt_sample: 50
+    # Once synced, MAVROS treats consecutive samples more than this far (default 10 ms) from
+    # its estimate as a clock jump: "TM: Time jump detected. Resetting time synchroniser."
+    # A 50 ms round trip over Wi-Fi can be up to ~25 ms off (uneven up/down legs), so with
+    # the default it resets on Wi-Fi jitter alone. Keep it equal to max_rtt_sample.
+    max_deviation_sample: 50
