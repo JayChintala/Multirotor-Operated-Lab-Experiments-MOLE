@@ -44,6 +44,7 @@ def nodes(context):
         Node(package='mavros', executable='mavros_node', name='mavros', output='screen',
              parameters=[f'{mavros_share}/launch/apm_pluginlists.yaml',
                          f'{mavros_share}/launch/apm_config.yaml',
+                         get_package_share_directory('mole_mocap') + '/config/mavros_lab.yaml',
                          {'fcu_url': f'tcp://{arg("pi")}:5760', 'gcs_url': '',
                           'tgt_system': 1, 'tgt_component': 1, 'fcu_protocol': 'v2.0'}]),
     ]

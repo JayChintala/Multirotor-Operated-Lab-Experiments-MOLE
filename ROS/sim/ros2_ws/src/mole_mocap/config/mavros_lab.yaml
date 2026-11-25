@@ -1,0 +1,9 @@
+# MAVROS overrides for the lab link: laptop -> Wi-Fi -> Pi (mavlink-router) -> UART -> FC.
+# Loaded by vicon.launch.py after MAVROS's own apm_config.yaml.
+/**/time:
+  ros__parameters:
+    # MAVROS ignores timesync samples with a round trip above this (default 10 ms) and warns
+    # "TM: RTT too high for timesync". Over Wi-Fi plus the Pi the round trip is usually 10-40 ms,
+    # so with the default the time sync never converges. Vision data is unaffected either way
+    # (ArduPilot corrects incoming timestamps itself), but log times and warnings are.
+    max_rtt_sample: 50
