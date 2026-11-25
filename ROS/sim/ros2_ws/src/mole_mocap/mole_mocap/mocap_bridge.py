@@ -4,12 +4,15 @@
         -> checks (finite, valid quaternion, not stale), rate limit
         -> /mavros/vision_pose/pose  (MAVROS sends VISION_POSITION_ESTIMATE to the FC)
 
-It also sets the EKF origin once (SET_GPS_GLOBAL_ORIGIN): with no GPS, ArduPilot will not
-use position modes (Loiter, Guided) until an origin exists. ArduPilot answers only when it
-actually sets the origin; if it already has one (FC not rebooted since an earlier run) it
-ignores the request silently. So each try also asks for the origin (MAV_CMD_REQUEST_MESSAGE
-GPS_GLOBAL_ORIGIN), which the FC answers whenever it has one. MAVROS publishes the answer on
-/mavros/global_position/gp_origin, which also releases lab_fence.
+It also sets the EKF origin once: with no GPS, ArduPilot will not use position modes
+(Loiter, Guided) until an origin exists. Each try (every 2 s until confirmed) sends:
+  - MAV_CMD_DO_SET_GLOBAL_ORIGIN as COMMAND_INT (the current way; ArduPilot refuses it as
+    COMMAND_LONG). The FC acks it; MAVROS logs "CMD: Unexpected command 611, result N":
+    0 accepted, 4 failed (origin already set, or EKF not initialised), 2 denied (bad location).
+  - SET_GPS_GLOBAL_ORIGIN (deprecated in ArduPilot 4.8, still in 4.7), which gets no reply.
+  - MAV_CMD_REQUEST_MESSAGE GPS_GLOBAL_ORIGIN, which the FC answers whenever it has an origin,
+    including one kept from an earlier run (it refuses to change an existing origin silently).
+MAVROS publishes the answer on /mavros/global_position/gp_origin, which also releases lab_fence.
 
 Losing Vicon in flight (on_loss:=land, the default): after loss_timeout_s without a pose while
 armed, it switches the EKF to source set 2 (no horizontal position: EK3_SRC2_POSXY 0) and
@@ -27,7 +30,7 @@ import rclpy
 from geographic_msgs.msg import GeoPointStamped
 from geometry_msgs.msg import PoseStamped
 from mavros_msgs.msg import State
-from mavros_msgs.srv import CommandLong, SetMode
+from mavros_msgs.srv import CommandInt, CommandLong, SetMode
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy, qos_profile_sensor_data
 
@@ -35,6 +38,8 @@ from mole_mocap.mocap_math import RateLimiter, pose_ok
 
 MAV_CMD_SET_EKF_SOURCE_SET = 42007
 MAV_CMD_REQUEST_MESSAGE = 512
+MAV_CMD_DO_SET_GLOBAL_ORIGIN = 611
+MAV_FRAME_GLOBAL = 0              # altitude AMSL
 MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN = 49
 
 
@@ -70,6 +75,7 @@ class MocapBridge(Node):
         self.create_timer(1.0, self.watchdog)
         self.create_subscription(State, '/mavros/state', self.on_state, 10)
         self.cmd = self.create_client(CommandLong, '/mavros/cmd/command')
+        self.cmd_int = self.create_client(CommandInt, '/mavros/cmd/command_int')
         self.set_mode = self.create_client(SetMode, '/mavros/set_mode')
         self.create_timer(0.1, self.loss_check)
         self.get_logger().info(f'{self.pose_topic} -> /mavros/vision_pose/pose at <= {rate_hz:g} Hz')
@@ -106,13 +112,20 @@ class MocapBridge(Node):
         msg = GeoPointStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.position.latitude, msg.position.longitude, msg.position.altitude = self.origin
+        if self.cmd_int.service_is_ready():
+            lat, lon, alt = self.origin
+            self.cmd_int.call_async(CommandInt.Request(
+                frame=MAV_FRAME_GLOBAL, command=MAV_CMD_DO_SET_GLOBAL_ORIGIN,
+                x=int(round(lat * 1e7)), y=int(round(lon * 1e7)), z=float(alt)))
         self.origin_pub.publish(msg)
         if self.cmd.service_is_ready():
             self.cmd.call_async(CommandLong.Request(command=MAV_CMD_REQUEST_MESSAGE,
                                                     param1=float(MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN)))
         if self.origin_tries % 5 == 1:
+            ready = self.cmd_int.service_is_ready() and self.cmd.service_is_ready()
             self.get_logger().info(f'setting EKF origin {self.origin} (try {self.origin_tries}); '
-                                   'waiting for the FC to confirm')
+                                   'waiting for the FC to confirm' +
+                                   ('' if ready else ' (MAVROS command services not up yet)'))
 
     def on_origin(self, msg):
         if not self.origin_set:
