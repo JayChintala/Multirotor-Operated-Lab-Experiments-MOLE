@@ -10,7 +10,8 @@
 #
 # chrony (not ntpdate): ntpdate sets the clock once and is deprecated; chrony keeps it locked
 # continuously and steps it at boot. Clock sync does not lower latency; it makes timestamps
-# comparable so latency can be measured. The FC gets the laptop's time from MAVROS (SYSTEM_TIME).
+# comparable so latency can be measured. The FC takes the laptop's time from MAVROS (SYSTEM_TIME)
+# when BRD_RTC_TYPES includes MAVLink (mole_mocap config/mocap.parm sets 3).
 # Safe to re-run.
 set -euo pipefail
 

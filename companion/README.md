@@ -189,7 +189,8 @@ Several clients can be connected at once; mavlink-router passes MAVLink between 
 
 The Pi has no battery-backed clock, and the MOLE hotspot has no internet, so the Pi's clock
 is wrong after boot. `time_sync.sh` locks it to the ground-station laptop with chrony, so
-laptop (ROS, Vicon), Pi and FC logs line up. MAVROS also sends the laptop's time to the FC.
+laptop (ROS, Vicon), Pi and FC logs line up. MAVROS also sends the laptop's time to the FC, which uses it when `BRD_RTC_TYPES` is 3
+(set in `mocap.parm`; the default 1 accepts GPS time only).
 
 ```bash
 bash companion/time_sync.sh server             # on the laptop, once (serves 10.42.0.0/24)

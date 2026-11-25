@@ -21,3 +21,6 @@ EK3_SRC1_YAW     6      # ExternalNav
 GPS1_TYPE        0      # no GPS module: stop the EKF/arming checks waiting for one
 COMPASS_ENABLE   0
 COMPASS_USE      0
+BRD_RTC_TYPES    3      # clock from GPS or MAVLink SYSTEM_TIME (MAVROS sends the laptop's time).
+                        #   Default 1 (GPS only) leaves the clock unset with no GPS:
+                        #   MAVROS "TM: Wrong FCU time", logs dated 1970
